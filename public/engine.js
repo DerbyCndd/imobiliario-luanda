@@ -106,7 +106,7 @@
 
   function newGame(code, hostPid) {
     return {
-      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false },
+      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false, turnTime: 60 }, tl: 0, tk: '',
       players: [], cur: 0, props: {}, houses: 32, hotels: 12,
       turn: { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 },
       debts: [], auction: null, aq: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
@@ -122,14 +122,15 @@
     if (S.players.length >= 12) return 'A sala está cheia (máximo 12 jogadores).';
     const taken = S.players.map((x) => x.token);
     if (token == null || taken.includes(token) || token < 0 || token >= 12) token = TOKENS.findIndex((_, i) => !taken.includes(i));
-    S.players.push({ id: pid, name, token, connected: true, cash: 0, pos: 0, jail: false, jt: 0, jc: [], bk: false });
+    S.players.push({ id: pid, name, token, connected: true, cash: 0, pos: 0, jail: false, jt: 0, jc: [], bk: false, miss: 0, auto: false });
     return null;
   }
 
   function start(S) {
     if (S.players.length < 2) return 'São precisos pelo menos 2 jogadores.';
     shuffle(S.players);
-    S.players.forEach((p) => { p.cash = S.settings.cash; p.pos = 0; p.jail = false; p.jt = 0; p.jc = []; p.bk = false; });
+    S.players.forEach((p) => { p.cash = S.settings.cash; p.pos = 0; p.jail = false; p.jt = 0; p.jc = []; p.bk = false; p.miss = 0; p.auto = false; });
+    S.tl = 0; S.tk = '';
     S.props = {};
     BOARD.forEach((s, i) => { if (s.t === 'prop' || s.t === 'rail' || s.t === 'util') S.props[i] = { owner: null, houses: 0, mort: false }; });
     S.decks.chance = shuffle(CARDS.chance.map((_, i) => i));
@@ -296,10 +297,62 @@
     const active = S.players.filter((p) => !p.bk && !A.pass.includes(p.id));
     if ((A.bidder && active.length <= 1) || (!A.bidder && active.length === 0)) finishAuction(S);
   }
+  /* ------------------------------------------------------------------ RELÓGIO E JOGO AUTOMÁTICO */
+  const actorOf = (S) => (S.turn.phase === 'debt' && S.debts.length ? byId(S, S.debts[0].pid) : cur(S));
+  const timeFor = (p, tt) => (p.auto ? 3 : !p.connected ? Math.min(tt, 15) : tt);
+  function autoStep(S, p) {
+    const T = S.turn, m = p;
+    if (T.phase === 'roll') {
+      if (m.jail && m.jc.length) act(S, m.id, { type: 'useJail' });
+      else if (m.jail && m.cash > 400) act(S, m.id, { type: 'payJail' });
+      act(S, m.id, { type: 'roll' });
+    } else if (T.phase === 'buy') {
+      if (m.cash >= BOARD[m.pos].p + 150) act(S, m.id, { type: 'buy' }); else act(S, m.id, { type: 'decline' });
+    } else if (T.phase === 'end') act(S, m.id, { type: 'endTurn' });
+    else if (T.phase === 'debt') {
+      for (let g = 0; g < 200 && S.phase === 'play' && S.debts.some((d) => d.pid === m.id); g++) {
+        const owned = Object.keys(S.props).map(Number).filter((i) => S.props[i].owner === m.id);
+        let did = false;
+        for (const i of owned) if (act(S, m.id, { type: 'sell', sq: i }) === null) { did = true; break; }
+        if (!did) for (const i of owned) if (act(S, m.id, { type: 'mortgage', sq: i }) === null) { did = true; break; }
+        if (!did) { act(S, m.id, { type: 'bankrupt' }); break; }
+      }
+    }
+  }
+  function autoTurn(S, p) {
+    S._auto = true;
+    try {
+      for (let n = 0; n < 14 && S.phase === 'play'; n++) {
+        const a = actorOf(S);
+        if (!a || a.id !== p.id || S.turn.phase === 'auction') break;
+        autoStep(S, a);
+      }
+    } finally { delete S._auto; }
+  }
+  // devolve 0 (nada), 1 (só relógio mudou) ou 2 (o estado do jogo mudou)
   function tick(S) {
-    if (S.phase !== 'play' || !S.auction) return false;
-    if (--S.auction.left <= 0) finishAuction(S);
-    return true;
+    if (S.phase !== 'play') return 0;
+    let ret = 0;
+    if (S.auction) {
+      ret = 1;
+      if (--S.auction.left <= 0) { finishAuction(S); ret = 2; }
+      else {
+        const A = S.auction;
+        S.players.forEach((p) => { if (p.auto && !p.bk && A.bidder !== p.id && !A.pass.includes(p.id)) A.pass.push(p.id); });
+        checkAuctionEnd(S); if (!S.auction) ret = 2;
+      }
+    }
+    const tt = S.settings.turnTime | 0;
+    if (!tt || S.phase !== 'play' || S.turn.phase === 'auction') { if (S.tl) { S.tl = 0; S.tk = ''; ret = Math.max(ret, 1); } return ret; }
+    const a = actorOf(S), key = S.cur + '|' + S.turn.phase + '|' + S.turn.seq + '|' + a.id + '|' + S.debts.length;
+    if (key !== S.tk) { S.tk = key; S.tl = timeFor(a, tt); return Math.max(ret, 1); }
+    if (--S.tl > 0) return Math.max(ret, 1);
+    a.miss = (a.miss || 0) + 1;
+    log(S, '⏱️ Tempo esgotado: a jogada de ' + a.name + ' é feita automaticamente.');
+    if (a.miss >= 2 && !a.auto) { a.auto = true; log(S, '🤖 ' + a.name + ' passou ao modo automático (volta a clicar para retomar).'); }
+    autoTurn(S, a);
+    S.tk = '';
+    return 2;
   }
 
   /* ------------------------------------------------------------------ FALÊNCIA */
@@ -459,7 +512,7 @@
       if (a.type === 'token') { const t = a.token | 0; if (t < 0 || t > 11 || S.players.some((x) => x.token === t && x.id !== pid)) return 'Peça indisponível.'; me.token = t; return null; }
       if (a.type === 'rename') { me.name = String(a.name || '').trim().slice(0, 16) || me.name; return null; }
       if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
-      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; return null; }
+      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
       if (a.type === 'start') return start(S);
       if (a.type === 'kick') { if (a.pid === pid) return 'Não te podes expulsar.'; S.players = S.players.filter((x) => x.id !== a.pid); return null; }
       return 'Acção inválida no lobby.';
@@ -467,7 +520,9 @@
     if (S.phase !== 'play') return 'O jogo terminou.';
     if (me.bk && a.type !== 'noop') return 'Já estás eliminado.';
     const T = S.turn, isCur = cur(S).id === pid;
+    if (!S._auto) { me.miss = 0; me.auto = false; }
     switch (a.type) {
+      case 'back': return null;
       case 'roll':
         if (!isCur || T.phase !== 'roll') return 'Não podes lançar os dados agora.';
         doRoll(S, me); return null;

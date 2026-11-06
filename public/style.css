@@ -197,3 +197,7 @@ label{font-size:14px}
 @media (max-height:720px) and (min-width:1100px){
   .panel{padding:9px}.brand{font-size:15px}
 }
+
+.tlv{margin-left:.6cqw;font-variant-numeric:tabular-nums;background:var(--gold);color:#2a1d02;border-radius:99px;padding:.2cqw 1.1cqw;font-size:max(9px,1.7cqw)}
+.tlv.low{background:var(--red);color:#fff;animation:pulse2 .6s infinite}
+@keyframes pulse2{50%{transform:scale(1.12)}}

@@ -14,7 +14,7 @@ function run(n,seed){
   let s=seed;E.rand=()=>{s=(s*1664525+1013904223)%4294967296;return s/4294967296};
   const S=E.newGame('TEST','p0');
   for(let i=0;i<n;i++)E.join(S,'p'+i,'J'+i,i);
-  S.settings.pot=seed%2===0;
+  S.settings.pot=seed%2===0;S.settings.turnTime=seed%3===0?0:3;
   let e=E.act(S,'p0',{type:'start'});if(e)throw new Error(e);
   const r=()=>E.rand();
   const errs={};
@@ -22,7 +22,6 @@ function run(n,seed){
   let steps=0;
   while(S.phase==='play'&&steps<30000){
     steps++;
-    const T=S.turn,c=E.cur(S);
     // acções aleatórias extras
     if(r()<0.15){const p=S.players[Math.floor(r()*S.players.length)];if(!p.bk){
       const owned=Object.keys(S.props).filter(i=>S.props[i].owner===p.id);
@@ -39,6 +38,9 @@ function run(n,seed){
       }}}
     if(S.trades.length&&r()<.5){const t=S.trades[0];A(t.to,{type:r()<.6?'tradeYes':'tradeNo',id:t.id});}
     check(S,'apos extra');
+    if(r()<0.35){E.tick(S);check(S,'apos tick');}
+    if(S.phase!=='play')break;
+    const T=S.turn,c=E.cur(S);
     if(S.phase!=='play')break;
     if(T.phase==='auction'){
       const p=S.players[Math.floor(r()*S.players.length)];
@@ -57,7 +59,7 @@ function run(n,seed){
     } else if(T.phase==='buy'){
       if(r()<.65)A(c.id,{type:'buy'}),(S.turn.phase==='buy'&&A(c.id,{type:'decline'}));else A(c.id,{type:'decline'});
     } else if(T.phase==='end'){A(c.id,{type:'endTurn'});}
-    else throw new Error('fase estranha '+T.phase);
+    else throw new Error('fase estranha '+T.phase+' '+JSON.stringify(S.turn)+' cur='+S.cur+' debts='+JSON.stringify(S.debts)+' auc='+JSON.stringify(S.auction)+' log='+JSON.stringify(S.log.slice(-6)));
     check(S,'fim passo');
   }
   return {S,steps,errs};

@@ -18,5 +18,5 @@ const B2=mk();tx(B2,{t:'join',code,pid:'pb',name:'Bruno'});ok(S().players.find(p
 const C=mk();tx(C,{t:'join',code,pid:'pc',name:'Carlos'});ok(C.errs()[0]&&/começou/.test(C.errs()[0].m),'novo jogador após início rejeitado');
 // leilão + relógio
 for(let i=0;i<60&&S().turn.phase!=='buy'&&S().phase==='play';i++){const w=W();const ph=S().turn.phase;if(ph==='roll')tx(w,{t:'act',a:{type:'roll'}});else if(ph==='end')tx(w,{t:'act',a:{type:'endTurn'}});else break}
-if(S().turn.phase==='buy'){tx(W(),{t:'act',a:{type:'decline'}});ok(S().auction&&S().auction.left===20,'leilão iniciado');R.tickAll();ok(S().auction.left===19,'relógio do leilão avança no servidor');}
+if(S().turn.phase==='buy'){tx(W(),{t:'act',a:{type:'decline'}});ok(S().auction&&S().auction.left===20,'leilão iniciado');R.tickAll();const clk=A.out.filter(m=>m.t==='clk').pop();ok(clk&&clk.left===19,'relógio do leilão avança e é enviado em mensagem leve');}
 console.log('TUDO OK');process.exit(0);

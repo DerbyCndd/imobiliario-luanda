@@ -36,6 +36,7 @@ function connect() {
   w.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 's') { S = m.s; roomCode = S.code; wantCreate = false; sess(); render(); }
+    else if (m.t === 'clk' && S) { S.tl = m.tl; if (S.auction) S.auction.left = m.left; updClock(); }
     else if (m.t === 'err') { toast(m.m, 4500); if (m.fatal) leaveRoom(); }
   };
   w.onclose = () => { clearTimeout(wd); if (w === ws) retry(); };
@@ -91,13 +92,20 @@ const colPct = (k) => { const w = [1.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.55]; let a
 function render() {
   if (!S) return;
   $('#home').classList.add('hidden');
-  const sig = JSON.stringify(S, (k, v) => (k === 'left' ? undefined : v)) + '|' + pid + '|' + ui.tab;
-  if (sig === ui.lastSig) { const el = $('#aucLeft'); if (el && S.auction) el.textContent = S.auction.left + 's'; return; }
+  const sig = JSON.stringify(S, (k, v) => (k === 'left' || k === 'tl' ? undefined : v)) + '|' + pid + '|' + ui.tab;
+  if (sig === ui.lastSig) { updClock(); return; }
   ui.lastSig = sig;
   if (S.phase === 'lobby') { $('#game').classList.add('hidden'); $('#lobby').classList.remove('hidden'); renderLobby(); }
   else { $('#lobby').classList.add('hidden'); $('#game').classList.remove('hidden'); renderGame(); }
 }
 
+function updClock() {
+  const el = $('#aucLeft'); if (el && S.auction) el.textContent = S.auction.left + 's';
+  const t = $('#tlv'); if (!t) return;
+  const on = S.phase === 'play' && S.settings.turnTime && S.turn.phase !== 'auction' && S.tl > 0;
+  t.classList.toggle('hidden', !on);
+  if (on) { t.textContent = '⏱ ' + S.tl + 's'; t.classList.toggle('low', S.tl <= 10); }
+}
 function renderLobby() {
   const isHost = pid === S.hostPid;
   const link = location.origin + location.pathname + '?sala=' + S.code;
@@ -115,7 +123,9 @@ function renderLobby() {
   <div class="card"><h2>A tua peça</h2><div class="tokens">${tk}</div></div>
   ${isHost ? `<div class="card"><h2>Regras da casa</h2>
     <div class="row"><label>Dinheiro inicial <input type="number" id="setCash" value="${S.settings.cash}" min="500" max="10000" step="100" style="width:110px"></label>
-    <label><input type="checkbox" id="setPot" ${S.settings.pot ? 'checked' : ''}> Multas e impostos acumulam no Parque Gratuito</label></div>
+    <label><input type="checkbox" id="setPot" ${S.settings.pot ? 'checked' : ''}> Multas e impostos acumulam no Parque Gratuito</label>
+    <label>Tempo por jogada <select id="setTime">${[[0, 'Sem limite'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']].map(([v, l]) => `<option value="${v}" ${S.settings.turnTime === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+    <p class="hint">Se alguém demorar mais que o tempo, o jogo joga a vez por essa pessoa; depois de 2 vezes seguidas passa a modo automático até voltar a clicar.</p>
     <p class="hint">Por defeito segue as regras oficiais: 1500 Kz iniciais e o Parque Gratuito não paga nada.</p></div>
     <button class="bigbtn" data-act="start" ${S.players.length < 2 ? 'disabled' : ''}>▶ Começar o jogo</button>
     ${S.players.length < 2 ? '<p class="hint" style="text-align:center">Faltam jogadores (mínimo 2).</p>' : ''}`
@@ -226,6 +236,7 @@ function actionsHtml() {
   }
   let h = `<div class="who"><span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span><span>Vez de <b>${esc(c.name)}</b>${mine ? ' <span style="color:var(--gold)">(tu)</span>' : ''}</span></div>`;
   if (m.bk) return h + '<p class="hint">Foste eliminado. Podes continuar a acompanhar o jogo e a conversar.</p>';
+  if (m.auto) h += '<div class="box2">🤖 <b>Modo automático</b>: o jogo está a jogar por ti porque demoraste.<div class="acts"><button class="good sm" data-act="back">Retomar o controlo</button></div></div>';
   if (T.phase === 'auction' && S.auction) h += auctionHtml(m);
   else if (T.phase === 'debt' && S.debts.length) {
     const d = S.debts[0], dp = E.byId(S, d.pid), to = d.to === 'bank' ? 'o Banco' : E.byId(S, d.to).name;
@@ -262,7 +273,7 @@ function playersHtml() {
     const nl = S.loans.filter((l) => l.borrower === p.id).length;
     return `<div class="pcard ${p.id === c.id && S.phase === 'play' ? 'turn' : ''} ${p.bk ? 'bk' : ''}">
       <div class="av" style="background:${pcol(p)}">${tokenOf(p)}</div>
-      <div class="info"><b>${esc(p.name)}${p.id === pid ? ' (tu)' : ''}${p.id === S.hostPid ? ' 👑' : ''}<span class="bdg">${p.jail ? '🔒' : ''}${p.jc.length ? '🎫'.repeat(p.jc.length) : ''}${nl ? '💳' + nl : ''}${!p.connected && !p.bk ? '📴' : ''}</span></b>
+      <div class="info"><b>${esc(p.name)}${p.id === pid ? ' (tu)' : ''}${p.id === S.hostPid ? ' 👑' : ''}<span class="bdg">${p.jail ? '🔒' : ''}${p.jc.length ? '🎫'.repeat(p.jc.length) : ''}${nl ? '💳' + nl : ''}${p.auto && !p.bk ? '🤖' : ''}${!p.connected && !p.bk ? '📴' : ''}</span></b>
         <span class="cash ${p.cash < 0 ? 'neg' : ''}">${p.bk ? 'Falido' : kz(p.cash)}</span><div class="chips">${chips}</div></div>
       ${isHost && p.id !== pid && !p.bk ? `<button class="sm ghost" data-act="kick" data-pid="${p.id}" data-confirm="Remover ${esc(p.name)} do jogo?">✖</button>` : ''}</div>`;
   }).join('');
@@ -353,8 +364,9 @@ function renderGame() {
   ensureSkeleton();
   const c = E.cur(S);
   $('#sqs').innerHTML = squaresHtml();
-  $('#pill').innerHTML = S.phase === 'over' ? '🏆 Fim de jogo' : `<span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span>Vez de ${esc(c.name)}`;
+  $('#pill').innerHTML = S.phase === 'over' ? '🏆 Fim de jogo' : `<span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span>Vez de ${esc(c.name)}${c.auto ? ' 🤖' : ''}<span class="tlv hidden" id="tlv"></span>`;
   $('#evt').textContent = lastEvent();
+  updClock();
   $('#potbox').innerHTML = S.settings.pot ? `<span class="potv">🅿️ Parque: ${kz(S.pot)}</span>` : '';
   $('#plist').innerHTML = playersHtml(); $('#bank').innerHTML = bankHtml();
   $('#act').innerHTML = actionsHtml();
@@ -467,7 +479,7 @@ document.addEventListener('click', (ev) => {
     case 'leave': if (!local && S.phase === 'play' && !confirm('Sair desta sala? Podes voltar a entrar com o mesmo código.')) break; leaveRoom(); break;
     case 'token': dispatch({ type: 'token', token: +t.dataset.token }); break;
     case 'kick': dispatch({ type: 'kick', pid: t.dataset.pid }); break;
-    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, pot: $('#setPot').checked }); dispatch({ type: 'start' }); break;
+    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value }); dispatch({ type: 'start' }); break;
     case 'bidrel': dispatch({ type: 'bid', amount: S.auction.bid + (+t.dataset.add) }); break;
     case 'bidcustom': dispatch({ type: 'bid', amount: +$('#bidAmt').value }); break;
     case 'chat': { const i = $('#chatIn'); if (i.value.trim()) { dispatch({ type: 'chat', text: i.value }); i.value = ''; } break; }
