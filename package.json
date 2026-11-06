@@ -1,0 +1,19 @@
+{
+  "name": "imobiliario-luanda",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Jogo de tabuleiro online (2-12 jogadores) com Next.js + WebSocket",
+  "scripts": {
+    "dev": "node server.js --dev",
+    "build": "next build",
+    "start": "node server.js",
+    "test": "node test.js && node test-rooms.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "ws": "8.18.0"
+  }
+}

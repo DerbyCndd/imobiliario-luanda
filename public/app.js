@@ -1,124 +1,71 @@
 'use strict';
-/* Imobiliário Luanda - interface e ligação online (PeerJS, anfitrião autoritativo) */
+/* Imobiliário Luanda - interface e ligação online (WebSocket para o servidor Next.js) */
 const E = window.Engine, B = E.BOARD;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const kz = (n) => Number(n).toLocaleString('pt-PT') + ' Kz';
 const FACES = '⚀⚁⚂⚃⚄⚅';
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ssGet = (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
 const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
-let S = null, role = null, peer = null, hostConn = null, roomCode = '', conns = {}, retryT = null, leaving = false, hostTimer = null;
+let S = null, ws = null, roomCode = '', retryT = null, leaving = false, wantCreate = false, attempts = 0, local = false;
 let pid = ssGet('imobl_pid') || (Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4));
 ssSet('imobl_pid', pid);
 let myName = lsGet('imobl_name') || '';
 let ui = { trade: null, lastSig: '', cardSeq: 0, diceSeq: -1, rolling: false, tab: 'log' };
 
-/* ====================================================================== REDE */
-function genCode() { let c = ''; for (let i = 0; i < 5; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return c; }
+/* ====================================================================== REDE (WebSocket) */
 function setNet(m) { const n = $('#net'); n.textContent = m || ''; n.classList.toggle('hidden', !m); }
 function toast(m, ms) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), ms || 3200); }
-function sess() { ssSet('imobl_sess', JSON.stringify({ role, code: roomCode })); }
+function sess() { ssSet('imobl_sess', JSON.stringify({ code: roomCode })); lsSet('imobl_last', JSON.stringify({ code: roomCode, pid })); }
+const wsUrl = () => (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
-function startHost(code, state) {
-  leaving = false; roomCode = code; setNet('A criar a sala…');
-  try { peer && peer.destroy(); } catch (e) {}
-  peer = new Peer('imobl-' + code);
-  peer.on('open', () => {
-    setNet('');
-    role = 'host';
-    if (state) { S = state; S.players.forEach((p) => { p.connected = p.id === pid; }); }
-    else { S = E.newGame(code, pid); E.join(S, pid, myName, 0); }
-    sess(); clearInterval(hostTimer);
-    hostTimer = setInterval(() => { if (S && S.phase === 'play' && S.auction) { E.tick(S); broadcast(); } }, 1000);
-    broadcast();
-  });
-  peer.on('connection', (c) => {
-    c.on('data', (m) => hostMsg(c, m));
-    c.on('close', () => hostLeft(c));
-    c.on('error', () => hostLeft(c));
-  });
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
-  peer.on('error', (err) => {
-    if (err.type === 'unavailable-id') {
-      if (state) { setNet(''); toast('A sala anterior ainda está ocupada. Espera uns segundos e tenta de novo.', 5000); goHome(); }
-      else startHost(genCode());
-    } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') setNet('Problema de rede… a tentar reconectar');
-    else toast('Erro de rede: ' + err.type);
-  });
-}
-function hostMsg(c, m) {
-  if (!S || !m) return;
-  if (m.t === 'join') {
-    const err = E.join(S, m.pid, m.name, m.token);
-    if (err) { c.send({ t: 'err', m: err, fatal: true }); return; }
-    c.pid = m.pid; conns[m.pid] = c; broadcast();
-  } else if (m.t === 'act' && c.pid) {
-    const err = E.act(S, c.pid, m.a || {});
-    if (err) c.send({ t: 'err', m: err });
-    broadcast();
-  }
-}
-function hostLeft(c) {
-  if (!c.pid || conns[c.pid] !== c) return;
-  delete conns[c.pid];
-  const p = E.byId(S, c.pid);
-  if (p) { p.connected = false; if (S.phase === 'lobby') S.players = S.players.filter((x) => x.id !== c.pid); }
-  broadcast();
-}
-function broadcast() {
-  for (const k in conns) { try { if (conns[k].open) conns[k].send({ t: 's', s: S }); } catch (e) {} }
-  lsSet('imobl_host', JSON.stringify({ code: S.code, pid, state: S }));
-  render();
-}
-function startClient(code) {
-  leaving = false; role = 'client'; roomCode = code; sess(); connectClient();
-}
-function connectClient() {
+function enter(create) { wantCreate = !!create; leaving = false; attempts = 0; connect(); }
+function connect() {
   clearTimeout(retryT);
   if (leaving) return;
-  try { peer && peer.destroy(); } catch (e) {}
-  setNet(S ? 'Ligação perdida. A reconectar…' : 'A ligar à sala…');
-  peer = new Peer();
-  peer.on('open', () => {
-    const c = peer.connect('imobl-' + roomCode, { reliable: true });
-    hostConn = c;
-    const wd = setTimeout(() => { if (!c.open) retry(); }, 12000);
-    c.on('open', () => { clearTimeout(wd); setNet(''); c.send({ t: 'join', pid, name: myName }); });
-    c.on('data', (m) => {
-      if (m.t === 's') { S = m.s; render(); }
-      else if (m.t === 'err') { toast(m.m); if (m.fatal) { leaveRoom(); } }
-    });
-    c.on('close', () => retry());
-    c.on('error', () => retry());
-  });
-  peer.on('error', (e) => {
-    if (e.type === 'peer-unavailable') {
-      if (!S) { setNet(''); toast('Sala não encontrada. Confirma o código (o anfitrião tem de ter a página aberta).', 5000); leaveRoom(); } else retry();
-    } else retry();
-  });
+  try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) {}
+  setNet(S ? 'Ligação perdida. A reconectar…' : attempts > 1 ? 'A acordar o servidor… pode demorar até 1 minuto' : 'A ligar…');
+  const w = (ws = new WebSocket(wsUrl()));
+  const wd = setTimeout(() => { if (w.readyState !== 1) { try { w.close(); } catch (e) {} } }, 8000);
+  w.onopen = () => {
+    clearTimeout(wd); attempts = 0; setNet('');
+    w.send(JSON.stringify(wantCreate && !S ? { t: 'create', pid, name: myName } : { t: 'join', code: roomCode, pid, name: myName }));
+  };
+  w.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.t === 's') { S = m.s; roomCode = S.code; wantCreate = false; sess(); render(); }
+    else if (m.t === 'err') { toast(m.m, 4500); if (m.fatal) leaveRoom(); }
+  };
+  w.onclose = () => { clearTimeout(wd); if (w === ws) retry(); };
+  w.onerror = () => {};
 }
-function retry() { if (leaving) return; setNet(S ? 'Ligação perdida. A reconectar…' : 'A ligar à sala…'); clearTimeout(retryT); retryT = setTimeout(connectClient, 2500); }
+function retry() {
+  if (leaving) return;
+  attempts++;
+  if (!S && attempts > 25) { setNet(''); toast('Não foi possível ligar ao servidor. Tenta de novo daqui a pouco.', 6000); leaveRoom(); return; }
+  setNet(S ? 'Ligação perdida. A reconectar…' : attempts > 1 ? 'A acordar o servidor… pode demorar até 1 minuto' : 'A ligar…');
+  clearTimeout(retryT); retryT = setTimeout(connect, Math.min(1000 + attempts * 500, 4000));
+}
 function dispatch(a) {
-  if (role === 'host') { const err = E.act(S, pid, a); if (err) toast(err); broadcast(); }
-  else if (hostConn && hostConn.open) hostConn.send({ t: 'act', a });
-  else toast('Sem ligação ao anfitrião.');
+  if (local) { const err = E.act(S, pid, a); if (err) toast(err); render(); return; }
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'act', a }));
+  else toast('Sem ligação ao servidor.');
 }
 function leaveRoom() {
-  leaving = true; clearTimeout(retryT); clearInterval(hostTimer);
-  try { peer && peer.destroy(); } catch (e) {}
-  peer = null; hostConn = null; conns = {}; S = null; role = null;
-  ssSet('imobl_sess', ''); setNet(''); goHome();
+  leaving = true; clearTimeout(retryT);
+  try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) {}
+  ws = null; S = null; roomCode = '';
+  ssSet('imobl_sess', ''); lsSet('imobl_last', ''); setNet(''); goHome();
 }
 function goHome() {
   S = null; ui.lastSig = '';
   ['lobby', 'game', 'modal', 'cardpop'].forEach((i) => $('#' + i).classList.add('hidden'));
   $('#home').classList.remove('hidden');
-  const saved = lsGet('imobl_host');
-  $('#bResume').classList.toggle('hidden', !saved);
+  let last = null; try { last = JSON.parse(lsGet('imobl_last') || 'null'); } catch (e) {}
+  const b = $('#bResume'); b.classList.toggle('hidden', !(last && last.code)); if (last && last.code) b.textContent = '↩️ Voltar à sala ' + last.code;
 }
 
 /* ====================================================================== HELPERS */
@@ -386,7 +333,7 @@ document.addEventListener('click', (ev) => {
   const a = t.dataset.act;
   switch (a) {
     case 'copy': { const v = $('#lnk').value; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast('Link copiado!'), () => { $('#lnk').select(); toast('Copia o link seleccionado.'); }); break; }
-    case 'leave': if (role === 'host' && S.phase === 'play' && !confirm('És o anfitrião: se saíres o jogo termina para todos. Sair?')) break; leaveRoom(); break;
+    case 'leave': if (!local && S.phase === 'play' && !confirm('Sair desta sala? Podes voltar a entrar com o mesmo código.')) break; leaveRoom(); break;
     case 'token': dispatch({ type: 'token', token: +t.dataset.token }); break;
     case 'kick': dispatch({ type: 'kick', pid: t.dataset.pid }); break;
     case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, pot: $('#setPot').checked }); dispatch({ type: 'start' }); break;
@@ -415,26 +362,22 @@ $('#name').value = myName;
 const urlRoom = (new URLSearchParams(location.search).get('sala') || '').toUpperCase();
 if (urlRoom) $('#code').value = urlRoom;
 function needName() { myName = $('#name').value.trim().slice(0, 16); if (!myName) { toast('Escreve o teu nome primeiro.'); $('#name').focus(); return false; } lsSet('imobl_name', myName); return true; }
-$('#bCreate').onclick = () => { if (needName()) startHost(genCode()); };
-$('#bJoin').onclick = () => { if (!needName()) return; const c = $('#code').value.trim().toUpperCase(); if (c.length !== 5) { toast('O código tem 5 letras/números.'); return; } startClient(c); };
+$('#bCreate').onclick = () => { if (needName()) enter(true); };
+$('#bJoin').onclick = () => { if (!needName()) return; const c = $('#code').value.trim().toUpperCase(); if (c.length !== 5) { toast('O código tem 5 letras/números.'); return; } roomCode = c; enter(false); };
 $('#bResume').onclick = () => {
   if (!needName()) return;
-  try { const r = JSON.parse(lsGet('imobl_host')); pid = r.pid; ssSet('imobl_pid', pid); startHost(r.code, r.state); } catch (e) { toast('Não foi possível retomar.'); lsSet('imobl_host', ''); goHome(); }
+  try { const r = JSON.parse(lsGet('imobl_last')); pid = r.pid; ssSet('imobl_pid', pid); roomCode = r.code; enter(false); } catch (e) { leaveRoom(); }
 };
 (function boot() {
   goHome();
   let s = null; try { s = JSON.parse(ssGet('imobl_sess') || 'null'); } catch (e) {}
-  if (s && s.code && myName) {
-    if (s.role === 'host') { try { const r = JSON.parse(lsGet('imobl_host')); if (r && r.code === s.code) { pid = r.pid; startHost(r.code, r.state); return; } } catch (e) {} }
-    else if (s.role === 'client') { startClient(s.code); return; }
-  }
-  if (urlRoom && myName) { /* o utilizador só tem de carregar em Entrar */ }
+  if (s && s.code && myName) { roomCode = s.code; enter(false); }
 })();
 
 /* modo demonstração offline (para testes visuais): ?demo=N */
 const demoN = +new URLSearchParams(location.search).get('demo');
 if (demoN) {
-  myName = 'Tu'; pid = 'p0'; role = 'host'; S = E.newGame('DEMO1', 'p0');
+  local = true; myName = 'Tu'; pid = 'p0'; S = E.newGame('DEMO1', 'p0');
   for (let i = 0; i < demoN; i++) E.join(S, 'p' + i, i ? 'Amigo ' + i : 'Tu', i);
   E.start(S);
   S.players.sort((a, b) => (a.id === 'p0' ? -1 : b.id === 'p0' ? 1 : 0)); S.cur = 0;

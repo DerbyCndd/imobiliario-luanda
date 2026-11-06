@@ -1,4 +1,4 @@
-const E=require('./engine.js');
+const E=require('./public/engine.js');
 function check(S,ctx){
   let h=0,ho=0;
   for(const i in S.props){const st=S.props[i];if(st.houses===5)ho++;else h+=st.houses;

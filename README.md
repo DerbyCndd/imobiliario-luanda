@@ -1,24 +1,30 @@
 # 🏠 Imobiliário Luanda
 
 Jogo de tabuleiro online (2 a 12 jogadores) com as regras, preços, rendas e cartas do tabuleiro clássico,
-com nomes de bairros de Luanda. Funciona no navegador, sem registo nem servidor próprio.
+com nomes de bairros de Luanda.
 
-## Como jogar
-1. Um jogador abre o site e carrega em **Criar sala** (é o anfitrião e tem de manter a página aberta).
-2. Partilha o **código** (ou o link) com os amigos, que entram em **Entrar numa sala**.
-3. Cada um escolhe a peça e o anfitrião carrega em **Começar**.
+**Stack:** Next.js 14 (páginas) + servidor Node com WebSocket (`server.js`, `lib/rooms.js`). O motor de regras
+(`public/engine.js`) corre no servidor, por isso criar uma sala é instantâneo e a sala continua viva mesmo que o
+criador feche a página (os jogadores reconectam sozinhos).
+
+## Correr localmente
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm test         # simula centenas de jogos + testa as salas
+```
+
+## Pôr online (Render, grátis)
+1. Em https://render.com → **New → Blueprint** → escolhe este repositório (o `render.yaml` configura tudo).
+2. Espera o deploy; o endereço `https://imobiliario-luanda.onrender.com` (ou semelhante) é o jogo.
+3. Nota: no plano grátis o servidor adormece após ~15 min sem uso e demora ~1 min a acordar no primeiro acesso.
+
+> A Vercel não serve para isto: não suporta servidores WebSocket permanentes.
 
 ## Regras implementadas
-- 40 casas, 28 propriedades (22 ruas, 4 linhas, 2 serviços), 1500 Kz iniciais, 200 Kz na Partida.
-- Duplos, 3 duplos = Cadeia, Cadeia (duplo / 50 Kz / carta), compra, **leilão** com relógio, rendas, grupo de cor (renda a dobrar).
-- Casas e hotéis (construção uniforme, 32 casas / 12 hotéis), hipotecas (resgate +10%).
-- Cartas de Sorte e Caixa Comunitária (16 + 16), incluindo "Sai livre da Cadeia".
-- **Trocas** entre jogadores (propriedades, dinheiro e cartas), dívidas, falência (para jogador ou banco) e vencedor.
-- Regra opcional: multas e impostos acumulam no Parque Gratuito.
-- Chat, reconexão automática e retoma da sala pelo anfitrião.
+40 casas, 28 propriedades, 1500 Kz iniciais, 200 Kz na Partida, duplos / 3 duplos = Cadeia, Cadeia (duplo / 50 Kz / carta),
+compra e **leilão** com relógio, rendas (cor completa a dobrar), casas e hotéis (construção uniforme, 32/12), hipotecas,
+cartas de Sorte e Caixa Comunitária (16+16), **trocas**, dívidas, falência, vencedor, chat e reconexão.
+Regra opcional: multas e impostos acumulam no Parque Gratuito.
 
-## Técnica
-Ligação peer-to-peer com [PeerJS](https://peerjs.com/): o anfitrião corre o motor de regras (`engine.js`)
-e os restantes jogadores ligam-se a ele. `node test.js` simula centenas de jogos para validar o motor.
-
-*Jogo de fãs, sem qualquer ligação à Hasbro. "Monopoly" é marca registada dos seus titulares.*
+*Jogo de fãs, sem ligação à Hasbro. "Monopoly" é marca registada dos seus titulares.*
