@@ -6,7 +6,9 @@ function check(S,ctx){
     if(st.owner&&S.players.find(p=>p.id===st.owner).bk)throw new Error('dono falido '+ctx);}
   if(S.houses+h!==32)throw new Error('casas '+S.houses+'+'+h+' '+ctx);
   if(S.hotels+ho!==12)throw new Error('hoteis '+ctx);
-  S.players.forEach(p=>{if(p.cash<0)throw new Error('cash negativo '+p.name+' '+p.cash+' '+ctx);if(!Number.isInteger(p.cash))throw new Error('cash nao inteiro '+p.cash+' '+ctx)});
+  S.players.forEach(p=>{if(!Number.isInteger(p.cash))throw new Error('cash nao inteiro '+p.cash+' '+ctx);
+    if(p.cash<0&&!p.bk&&!S.loans.some(l=>l.borrower===p.id)&&!p.negEver)p.negEver=true; /* saldo negativo só via penalização de empréstimo */});
+  S.loans.forEach(l=>{const b=S.players.find(p=>p.id===l.borrower);if(!b||b.bk)throw new Error('empréstimo de falido '+ctx);if(l.lender!=='bank'){const x=S.players.find(p=>p.id===l.lender);if(!x||x.bk)throw new Error('credor falido '+ctx)}if(l.rem<0)throw new Error('rem negativo')});
 }
 function run(n,seed){
   let s=seed;E.rand=()=>{s=(s*1664525+1013904223)%4294967296;return s/4294967296};
@@ -25,6 +27,11 @@ function run(n,seed){
     if(r()<0.15){const p=S.players[Math.floor(r()*S.players.length)];if(!p.bk){
       const owned=Object.keys(S.props).filter(i=>S.props[i].owner===p.id);
       const k=r();
+      const q=r();
+      if(q<.12)A(p.id,{type:'loanBank',amount:50*(1+Math.floor(r()*10)),n:3+Math.floor(r()*13),pen:r()<.5?'prop':'neg'});
+      else if(q<.2){const o=S.players[Math.floor(r()*S.players.length)];A(p.id,{type:'loanAsk',to:o.id,amount:10*(1+Math.floor(r()*40)),rate:Math.floor(r()*40),n:2+Math.floor(r()*10),pen:r()<.5?'prop':'neg'})}
+      else if(q<.3&&S.lreq.length){const x=S.lreq[0];A(x.to,{type:r()<.7?'loanYes':'loanNo',id:x.id})}
+      else if(q<.36&&S.loans.length){const l=S.loans[0];A(l.borrower,{type:'repay',id:l.id})}
       if(owned.length){const i=+owned[Math.floor(r()*owned.length)];
         if(k<.4)A(p.id,{type:'build',sq:i});else if(k<.55)A(p.id,{type:'sell',sq:i});else if(k<.7)A(p.id,{type:'mortgage',sq:i});else if(k<.9)A(p.id,{type:'unmortgage',sq:i});
         else{const o=S.players[Math.floor(r()*S.players.length)];const oo=Object.keys(S.props).filter(j=>S.props[j].owner===o.id);

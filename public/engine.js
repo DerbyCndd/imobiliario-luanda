@@ -109,7 +109,7 @@
       v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false },
       players: [], cur: 0, props: {}, houses: 32, hotels: 12,
       turn: { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 },
-      debts: [], auction: null, aq: [], trades: [], tid: 0, log: [], pot: 0,
+      debts: [], auction: null, aq: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
       card: null, cardSeq: 0, decks: { chance: [], cc: [] }, winner: null,
     };
   }
@@ -134,7 +134,7 @@
     BOARD.forEach((s, i) => { if (s.t === 'prop' || s.t === 'rail' || s.t === 'util') S.props[i] = { owner: null, houses: 0, mort: false }; });
     S.decks.chance = shuffle(CARDS.chance.map((_, i) => i));
     S.decks.cc = shuffle(CARDS.cc.map((_, i) => i));
-    S.houses = 32; S.hotels = 12; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.trades = []; S.winner = null;
+    S.houses = 32; S.hotels = 12; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.trades = []; S.loans = []; S.lreq = []; S.lid = 0; S.winner = null;
     S.cur = 0; S.phase = 'play';
     S.turn = { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 };
     log(S, 'O jogo começou! Primeiro a jogar: ' + cur(S).name + '.');
@@ -252,6 +252,7 @@
     if (S.phase !== 'play') return;
     do { S.cur = (S.cur + 1) % S.players.length; } while (cur(S).bk);
     S.turn = { phase: 'roll', doubles: 0, extra: false, dice: S.turn.dice, seq: S.turn.seq, pend: 0 };
+    collectLoans(S, cur(S));
   }
 
   function doRoll(S, p) {
@@ -309,6 +310,10 @@
     S.debts = S.debts.filter((d) => d.pid !== pid);
     S.debts.forEach((d) => { if (d.to === pid) d.to = 'bank'; });
     S.trades = S.trades.filter((t) => t.from !== pid && t.to !== pid);
+    S.lreq = S.lreq.filter((r) => r.from !== pid && r.to !== pid);
+    S.loans = S.loans.filter((l) => l.borrower !== pid);
+    const heir = !forceBank && S.debts.find((d) => d.pid === pid);
+    S.loans.forEach((l) => { if (l.lender === pid) l.lender = heir && heir.to !== 'bank' ? heir.to : 'bank'; });
     const mine = Object.keys(S.props).map(Number).filter((i) => S.props[i].owner === pid);
     mine.forEach((i) => {
       const st = S.props[i];
@@ -317,7 +322,7 @@
     });
     if (to) {
       log(S, p.name + ' faliu e entregou tudo a ' + to.name + '.');
-      to.cash += p.cash;
+      to.cash += Math.max(0, p.cash);
       mine.forEach((i) => {
         const st = S.props[i]; st.owner = to.id;
         if (st.mort) { const fee = Math.ceil(BOARD[i].p * 0.05); const pay = Math.min(fee, to.cash); to.cash -= pay; }
@@ -335,6 +340,55 @@
     if (S.aq.length) { startAuction(S, S.aq.shift()); return; }
     if (S.debts.length) { if (settle(S)) afterDebt(S); return; }
     if (S.turn.phase === 'debt' || S.turn.phase === 'buy' || cur(S).id === pid) { S.turn.phase = 'moving'; flow(S); }
+  }
+
+  /* ------------------------------------------------------------------ EMPRÉSTIMOS */
+  const LOAN_GRACE = 2;
+  const bankRate = (n) => 5 + 2 * n;               // % total de juros do banco conforme o prazo
+  const loanTotal = (amount, rate) => Math.round(amount * (1 + rate / 100));
+  function newLoan(S, lender, borrower, amount, rate, n, pen) {
+    const total = loanTotal(amount, rate);
+    return { id: ++S.lid, lender, borrower, principal: amount, rate, n, inst: Math.ceil(total / n), total, rem: total, miss: 0, grace: LOAN_GRACE, pen };
+  }
+  function creditLender(S, L, amt) { if (L.lender !== 'bank') { const l = byId(S, L.lender); if (l) l.cash += amt; } }
+  function dropLoan(S, L) { S.loans = S.loans.filter((x) => x.id !== L.id); }
+  function collectLoans(S, p) {
+    for (const L of S.loans.filter((l) => l.borrower === p.id)) {
+      const pay = Math.min(L.inst, L.rem), who = L.lender === 'bank' ? 'ao banco' : 'a ' + byId(S, L.lender).name;
+      if (p.cash >= pay) {
+        p.cash -= pay; creditLender(S, L, pay); L.rem -= pay; L.miss = 0;
+        log(S, '💳 ' + p.name + ' pagou a prestação de ' + money(pay) + ' ' + who + '.');
+        if (L.rem <= 0) { dropLoan(S, L); log(S, '✅ ' + p.name + ' liquidou o empréstimo.'); }
+        continue;
+      }
+      L.miss++;
+      log(S, '⚠️ ' + p.name + ' não conseguiu pagar a prestação de ' + money(pay) + ' (falha ' + L.miss + '/' + L.grace + ').');
+      if (L.miss >= L.grace) penalize(S, p, L, pay, who);
+    }
+  }
+  function penalize(S, p, L, pay, who) {
+    if (L.pen === 'prop') {
+      const mine = Object.keys(S.props).map(Number).filter((i) => S.props[i].owner === p.id);
+      mine.sort((a, b) => (S.props[a].houses > 0) - (S.props[b].houses > 0) || BOARD[a].p - BOARD[b].p);
+      if (mine.length) {
+        const i = mine[0], st = S.props[i], value = st.mort ? BOARD[i].p / 2 : BOARD[i].p;
+        if (st.houses === 5) S.hotels++; else S.houses += st.houses;
+        st.houses = 0;
+        st.owner = L.lender === 'bank' ? null : L.lender; if (L.lender === 'bank') st.mort = false;
+        L.rem = Math.max(0, L.rem - value); L.miss = 0;
+        log(S, '🏚️ ' + BOARD[i].n + ' foi confiscada a ' + p.name + ' (abate ' + money(value) + ' à dívida).');
+        if (L.rem <= 0) { dropLoan(S, L); log(S, '✅ Empréstimo liquidado com a propriedade confiscada.'); }
+        return;
+      }
+    }
+    p.cash -= pay; creditLender(S, L, pay); L.rem -= pay; L.miss = 0;
+    log(S, '🔻 ' + p.name + ' ficou com saldo ' + (p.cash < 0 ? 'negativo' : 'reduzido') + ' (' + money(p.cash) + ') pela prestação em atraso ' + who + '.');
+    if (L.rem <= 0) dropLoan(S, L);
+  }
+  function termsError(a, maxAmt) {
+    if (!(a.amount >= 10 && a.amount <= maxAmt) || a.amount % 10) return 'Valor inválido.';
+    if (!(a.n >= 2 && a.n <= 20)) return 'O prazo tem de ser entre 2 e 20 rondas.';
+    return null;
   }
 
   /* ------------------------------------------------------------------ PROPRIEDADES */
@@ -503,6 +557,45 @@
         const t = S.trades.find((x) => x.id === a.id); if (!t || (t.to !== pid && t.from !== pid)) return 'Proposta inexistente.';
         S.trades = S.trades.filter((x) => x.id !== t.id); log(S, t.to === pid ? me.name + ' recusou uma troca.' : me.name + ' cancelou uma troca.'); return null;
       }
+      case 'loanBank': {
+        const amt = a.amount | 0, n = a.n | 0, pen = a.pen === 'neg' ? 'neg' : 'prop';
+        if (amt < 50 || amt > 1000 || amt % 50) return 'O banco empresta entre 50 e 1000 Kz (múltiplos de 50).';
+        if (n < 3 || n > 15) return 'Prazo do banco: 3 a 15 rondas.';
+        if (S.loans.filter((l) => l.borrower === pid).length >= 4) return 'Máximo de 4 empréstimos activos.';
+        const owed = S.loans.filter((l) => l.borrower === pid && l.lender === 'bank').reduce((s, l) => s + l.rem, 0);
+        if (owed + loanTotal(amt, bankRate(n)) > 2500) return 'Limite de dívida ao banco: 2500 Kz.';
+        S.loans.push(newLoan(S, 'bank', pid, amt, bankRate(n), n, pen)); me.cash += amt;
+        log(S, '🏦 ' + me.name + ' pediu ' + money(amt) + ' ao banco (' + bankRate(n) + '% de juros, ' + n + ' rondas).'); trySettle(S); return null;
+      }
+      case 'loanAsk': {
+        const to = byId(S, a.to);
+        if (!to || to.bk || to.id === pid) return 'Jogador inválido.';
+        const t = { amount: a.amount | 0, n: a.n | 0, rate: Math.floor(+a.rate), pen: a.pen === 'neg' ? 'neg' : 'prop' };
+        const e = termsError(t, 5000); if (e) return e;
+        if (!(t.rate >= 0 && t.rate <= 100)) return 'A taxa de juro tem de estar entre 0% e 100%.';
+        if (S.lreq.filter((r) => r.from === pid).length >= 3) return 'Tens demasiados pedidos pendentes.';
+        if (S.loans.filter((l) => l.borrower === pid).length >= 4) return 'Máximo de 4 empréstimos activos.';
+        S.lreq.push({ id: ++S.lid, from: pid, to: to.id, ...t });
+        log(S, '💬 ' + me.name + ' pediu ' + money(t.amount) + ' a ' + to.name + '.'); return null;
+      }
+      case 'loanYes': {
+        const r = S.lreq.find((x) => x.id === a.id && x.to === pid); if (!r) return 'Pedido inexistente.';
+        const b = byId(S, r.from); S.lreq = S.lreq.filter((x) => x.id !== r.id);
+        if (!b || b.bk) return 'O jogador já não está no jogo.';
+        if (avail(S, me) < r.amount) return 'Não tens dinheiro suficiente para emprestar.';
+        if (S.loans.filter((l) => l.borrower === b.id).length >= 4) return 'O jogador já tem demasiados empréstimos.';
+        me.cash -= r.amount; b.cash += r.amount; S.loans.push(newLoan(S, pid, b.id, r.amount, r.rate, r.n, r.pen));
+        log(S, '🤝 ' + me.name + ' emprestou ' + money(r.amount) + ' a ' + b.name + ' (' + r.rate + '%, ' + r.n + ' rondas).'); trySettle(S); return null;
+      }
+      case 'loanNo': {
+        const r = S.lreq.find((x) => x.id === a.id && (x.to === pid || x.from === pid)); if (!r) return 'Pedido inexistente.';
+        S.lreq = S.lreq.filter((x) => x.id !== r.id); log(S, r.to === pid ? me.name + ' recusou um pedido de empréstimo.' : me.name + ' cancelou um pedido de empréstimo.'); return null;
+      }
+      case 'repay': {
+        const L = S.loans.find((x) => x.id === a.id && x.borrower === pid); if (!L) return 'Empréstimo inexistente.';
+        if (avail(S, me) < L.rem) return 'Precisas de ' + money(L.rem) + ' para quitar.';
+        me.cash -= L.rem; creditLender(S, L, L.rem); dropLoan(S, L); log(S, '✅ ' + me.name + ' quitou um empréstimo antecipadamente.'); return null;
+      }
       case 'kick': {
         if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
         const v = byId(S, a.pid); if (!v || v.bk) return 'Jogador inválido.';
@@ -512,6 +605,6 @@
     return 'Acção desconhecida.';
   }
 
-  Object.assign(E, { BOARD, GROUPS, GC, RAILS, UTILS, TOKENS, PCOL, CARDS, newGame, join, start, act, tick, byId, cur, calcRent, canBuild, canSell, mortVal, unmortCost, validTrade, ownsGroup, groupBuilt, money });
+  Object.assign(E, { BOARD, GROUPS, GC, RAILS, UTILS, TOKENS, PCOL, CARDS, newGame, join, start, act, tick, byId, cur, calcRent, canBuild, canSell, bankRate, loanTotal, LOAN_GRACE, mortVal, unmortCost, validTrade, ownsGroup, groupBuilt, money });
   if (typeof module !== 'undefined' && module.exports) module.exports = E; else root.Engine = E;
 })(typeof window !== 'undefined' ? window : this);
