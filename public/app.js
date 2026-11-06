@@ -92,7 +92,7 @@ const colPct = (k) => { const w = [1.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.55]; let a
 function render() {
   if (!S) return;
   $('#home').classList.add('hidden');
-  const sig = JSON.stringify(S, (k, v) => (k === 'left' || k === 'tl' ? undefined : v)) + '|' + pid + '|' + ui.tab;
+  const sig = JSON.stringify(S, (k, v) => (k === 'left' || k === 'tl' ? undefined : v)) + '|' + pid + '|' + ui.tab + '|' + !!ui.sheet;
   if (sig === ui.lastSig) { updClock(); return; }
   ui.lastSig = sig;
   if (S.phase === 'lobby') { $('#game').classList.add('hidden'); $('#lobby').classList.remove('hidden'); renderLobby(); }
@@ -250,7 +250,7 @@ function actionsHtml() {
       h += deedHtml(m.pos) + `<div class="acts"><button class="good" data-act="buy" ${m.cash < B[m.pos].p ? 'disabled' : ''}>Comprar por ${kz(B[m.pos].p)}</button><button class="alt" data-act="decline">Leilão</button></div>`;
     } else if (T.phase === 'end') h += `<p class="hint">Podes construir, negociar ou pedir empréstimos antes de terminar.</p><div class="acts"><button class="bigbtn" data-act="endTurn">✅ Terminar a vez</button></div>`;
   } else h += `<p class="hint">⏳ A aguardar ${esc(c.name)}…</p>`;
-  h += `<div class="acts"><button class="ghost sm" data-open="trade">🤝 Troca</button><button class="ghost sm" data-open="loanBank">🏦 Banco</button><button class="ghost sm" data-open="loanAsk">💸 Pedir a jogador</button><button class="ghost sm" data-open="rules">📖</button></div>`;
+  h += `<div class="acts sec"><button class="ghost sm" data-open="trade"><span class="ti">🤝</span>Troca</button><button class="ghost sm" data-open="loanBank"><span class="ti">🏦</span>Banco</button><button class="ghost sm" data-open="loanAsk"><span class="ti">💸</span>Pedir a jogador</button><button class="ghost sm rulesbtn" data-open="rules"><span class="ti">📖</span>Regras</button></div>`;
   return h;
 }
 function auctionHtml(m) {
@@ -328,8 +328,19 @@ const logHtml = () => S.log.slice(-80).map((l) => (typeof l === 'string' ? `<div
 const incomingDeals = () => S.trades.filter((t) => t.to === pid).length + S.lreq.filter((r) => r.to === pid).length;
 
 function tabsHtml() {
-  const n = incomingDeals(), tabs = [['props', '🏠 Imóveis'], ['loans', '💳 Dívidas'], ['deals', '🤝 Propostas'], ['log', '💬 Registo'], ['players', '👥']];
-  return tabs.map(([k, l]) => `<button class="${ui.tab === k ? 'on' : ''} ${k === 'players' ? 'pltab' : ''}" data-tab="${k}">${l}${k === 'deals' && n ? `<span class="b">${n}</span>` : ''}</button>`).join('');
+  const n = incomingDeals(), tabs = [['props', '🏠', 'Imóveis'], ['loans', '💳', 'Dívidas'], ['deals', '🤝', 'Propostas'], ['log', '💬', 'Registo'], ['players', '👥', 'Jogadores']];
+  return tabs.map(([k, i, l]) => `<button class="${ui.tab === k ? 'on' : ''} ${k === 'players' ? 'pltab' : ''}" data-tab="${k}" aria-label="${l}"><span class="ti">${i}</span><span class="tl">${l}</span>${k === 'deals' && n ? `<span class="b">${n}</span>` : ''}</button>`).join('');
+}
+const isMobile = () => window.matchMedia('(max-aspect-ratio:1/1),(max-width:560px)').matches;
+function mbarHtml() {
+  const m = me();
+  return `<div class="mb-l"><span class="mb-logo">🏠</span><div class="mb-t"><b>Imobiliário Luanda</b><small>Sala ${esc(S.code)}</small></div></div>
+    <div class="mb-r"><div class="mb-cash ${m.cash < 0 ? 'neg' : ''}"><small>Saldo</small><b>${m.bk ? 'Falido' : kz(m.cash)}</b></div><button class="ghost ibtn" data-open="rules" aria-label="Regras">📖</button></div>`;
+}
+function pstripHtml() {
+  const c = E.cur(S);
+  return S.players.map((p) => `<button class="pchip ${p.id === c.id && S.phase === 'play' ? 'turn' : ''} ${p.bk ? 'bk' : ''} ${p.id === pid ? 'me' : ''}" data-tab="players" data-pid="${p.id}">
+    <span class="av" style="background:${pcol(p)}">${tokenOf(p)}</span><span class="pi"><b>${esc(p.name)}${p.jail ? ' 🔒' : ''}${p.auto && !p.bk ? ' 🤖' : ''}${!p.connected && !p.bk ? ' 📴' : ''}</b><em class="${p.cash < 0 ? 'neg' : ''}">${p.bk ? 'Falido' : kz(p.cash)}</em></span></button>`).join('');
 }
 function tabContent() {
   switch (ui.tab) {
@@ -344,7 +355,8 @@ function tabContent() {
 /* ---------- jogo ---------- */
 function ensureSkeleton() {
   const g = $('#game'); if (g.firstChild) return;
-  g.innerHTML = `<aside class="colL"><div class="panel"><div class="brand">IMOBILIÁRIO LUANDA<small>SALA ${esc(S.code)}</small></div></div>
+  g.innerHTML = `<header class="mbar" id="mbar"></header><div class="pstrip scroll" id="pstrip"></div><div id="scrim" data-sheet-close="1"></div>
+  <aside class="colL"><div class="panel"><div class="brand">IMOBILIÁRIO LUANDA<small>SALA ${esc(S.code)}</small></div></div>
     <div class="panel grow"><h3>Jogadores</h3><div id="plist" class="scroll"></div></div><div class="panel" id="bank"></div></aside>
   <main class="boardArea"><div class="boardwrap"><div id="board"><div id="sqs"></div>
     <div class="center" id="center"><div class="turnpill" id="pill"></div>
@@ -355,7 +367,7 @@ function ensureSkeleton() {
   <aside class="colR"><div class="panel" id="act"></div>
     <div class="panel grow tabs"><nav id="tabs"></nav><div id="tabc" class="scroll"></div>
       <div id="chatrow" class="hidden"><input id="chatIn" maxlength="200" placeholder="Escreve uma mensagem…"><button class="alt sm" data-act="chat">Enviar</button></div>
-      <p style="text-align:center;margin:8px 0 0"><button class="ghost sm" data-act="leave" data-confirm="Sair do jogo?">Sair da sala</button></p></div></aside>`;
+      <p class="leavep" style="text-align:center;margin:8px 0 0"><button class="ghost sm" data-act="leave" data-confirm="Sair do jogo?">Sair da sala</button></p></div></aside>`;
   setDice(S.turn.dice, false);
   ui.diceSeq = S.turn.seq;
 }
@@ -364,12 +376,21 @@ function renderGame() {
   ensureSkeleton();
   const c = E.cur(S);
   $('#sqs').innerHTML = squaresHtml();
-  $('#pill').innerHTML = S.phase === 'over' ? '🏆 Fim de jogo' : `<span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span>Vez de ${esc(c.name)}${c.auto ? ' 🤖' : ''}<span class="tlv hidden" id="tlv"></span>`;
+  $('#pill').innerHTML = S.phase === 'over' ? '🏆 Fim de jogo' : `<span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span>${c.id === pid ? 'A tua vez' : 'Vez de ' + esc(c.name)}${c.auto ? ' 🤖' : ''}<span class="tlv hidden" id="tlv"></span>`;
   $('#evt').textContent = lastEvent();
   updClock();
   $('#potbox').innerHTML = S.settings.pot ? `<span class="potv">🅿️ Parque: ${kz(S.pot)}</span>` : '';
   $('#plist').innerHTML = playersHtml(); $('#bank').innerHTML = bankHtml();
   $('#act').innerHTML = actionsHtml();
+  const mineTurn = S.phase === 'play' && c.id === pid;
+  $('#act').classList.toggle('mine', mineTurn);
+  if (mineTurn && !ui.wasMine) { try { navigator.vibrate && navigator.vibrate(70); } catch (e) {} }
+  ui.wasMine = mineTurn;
+  $('#mbar').innerHTML = mbarHtml();
+  const ps = $('#pstrip'); ps.innerHTML = pstripHtml();
+  if (ui.stripTurn !== c.id) { ui.stripTurn = c.id; const el = ps.querySelector('.pchip.turn'); if (el) ps.scrollLeft = el.offsetLeft - (ps.clientWidth - el.offsetWidth) / 2; }
+  $('#game').classList.toggle('sheet', !!ui.sheet);
+  $('.tabs').classList.toggle('open', !!ui.sheet);
   $('#tabs').innerHTML = tabsHtml();
   const tc = $('#tabc'), keep = tc.scrollTop, atEnd = tc.scrollTop + tc.clientHeight >= tc.scrollHeight - 30;
   tc.innerHTML = tabContent();
@@ -405,7 +426,7 @@ function rulesHtml() {
   <p><b>Objectivo:</b> ficar como o único jogador com dinheiro. Cada jogador começa com 1500 Kz.</p>
   <p><b>Vez:</b> lança os dados e avança. Passar pela <b>Partida</b> dá 200 Kz. <b>Duplo</b> = jogas outra vez; <b>3 duplos</b> seguidos = Cadeia.</p>
   <p><b>Comprar:</b> propriedade sem dono pode ser comprada; se recusares vai a <b>leilão</b>. Com dono, pagas renda.</p>
-  <p><b>Cores:</b> todas as ruas de uma cor = renda a dobrar e podes construir (uniformemente; 4 casas e depois hotel). O banco tem 32 casas e 12 hotéis.</p>
+  <p><b>Cores:</b> todas as ruas de uma cor = renda a dobrar e podes construir (uniformemente; 4 casas e depois hotel). O banco tem 32 casas e 12 hotéis (com mais de 8 jogadores, ganha 4 casas e 1,5 hotéis por jogador extra: 12 jogadores = 48 casas e 18 hotéis).</p>
   <p><b>Linhas e serviços:</b> linhas 25/50/100/200 Kz; serviços 4× (ou 10× com os dois) os dados.</p>
   <p><b>Cadeia:</b> sais com duplo, 50 Kz ou carta. À 3.ª tentativa falhada pagas 50 Kz e avanças.</p>
   <p><b>Hipotecas:</b> recebes metade do preço; resgatar custa +10%. Sem renda enquanto hipotecada.</p>
@@ -461,10 +482,16 @@ function updLoanSum(kind) {
 
 /* ====================================================================== EVENTOS */
 document.addEventListener('click', (ev) => {
-  const t = ev.target.closest('[data-act],[data-sq],[data-open],[data-close],[data-trade-to],[data-tab]');
+  const t = ev.target.closest('[data-act],[data-sq],[data-open],[data-close],[data-trade-to],[data-tab],[data-sheet-close]');
   if (!t) { if (ev.target.id === 'modal') closeModal(); if (ev.target.closest('#cardpop')) $('#cardpop').classList.add('hidden'); return; }
   if (t.dataset.close) { closeModal(); return; }
-  if (t.dataset.tab) { ui.tab = t.dataset.tab; ui.tabJust = true; ui.lastSig = ''; render(); return; }
+  if (t.dataset.sheetClose) { ui.sheet = false; ui.lastSig = ''; render(); return; }
+  if (t.dataset.tab) {
+    const same = ui.tab === t.dataset.tab;
+    ui.tab = t.dataset.tab; ui.tabJust = true; ui.lastSig = '';
+    if (isMobile()) ui.sheet = same && ui.sheet ? false : true; // no telemóvel as abas abrem/fecham a folha inferior
+    render(); return;
+  }
   if (t.dataset.open === 'rules') { openModal(rulesHtml()); return; }
   if (t.dataset.open === 'trade') { ui.trade = { to: null, give: { cash: 0, props: [], jc: 0 }, get: { cash: 0, props: [], jc: 0 } }; openModal(''); refreshTrade(); return; }
   if (t.dataset.open === 'loanBank') { if (me().bk) return; openModal(loanBankModal()); updLoanSum('bank'); return; }
@@ -539,6 +566,6 @@ if (demoN) {
   S.cur = 0; S.turn.phase = 'roll'; S.turn.doubles = 0; S.turn.extra = false;
   render();
 }
-{ const q = new URLSearchParams(location.search); if (demoN && q.get('tab')) { ui.tab = q.get('tab'); ui.lastSig = ''; render(); }
+{ const q = new URLSearchParams(location.search); if (demoN && q.get('tab')) { ui.tab = q.get('tab'); ui.sheet = !!q.get('sheet'); ui.lastSig = ''; render(); }
   if (demoN && q.get('modal') === 'loan') { openModal(loanBankModal()); updLoanSum('bank'); }
   if (demoN && q.get('modal') === 'ask') { openModal(loanAskModal()); updLoanSum('ask'); } }

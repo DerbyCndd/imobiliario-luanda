@@ -135,7 +135,9 @@
     BOARD.forEach((s, i) => { if (s.t === 'prop' || s.t === 'rail' || s.t === 'util') S.props[i] = { owner: null, houses: 0, mort: false }; });
     S.decks.chance = shuffle(CARDS.chance.map((_, i) => i));
     S.decks.cc = shuffle(CARDS.cc.map((_, i) => i));
-    S.houses = 32; S.hotels = 12; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.trades = []; S.loans = []; S.lreq = []; S.lid = 0; S.winner = null;
+    /* até 8 jogadores: 32 casas e 12 hotéis; acima disso o banco ganha 4 casas e 1,5 hotéis por jogador */
+    S.houseMax = Math.max(32, 4 * S.players.length); S.hotelMax = Math.max(12, Math.ceil(1.5 * S.players.length));
+    S.houses = S.houseMax; S.hotels = S.hotelMax; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.trades = []; S.loans = []; S.lreq = []; S.lid = 0; S.winner = null;
     S.cur = 0; S.phase = 'play';
     S.turn = { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 };
     log(S, 'O jogo começou! Primeiro a jogar: ' + cur(S).name + '.');

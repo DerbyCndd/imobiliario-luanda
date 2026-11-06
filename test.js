@@ -4,8 +4,8 @@ function check(S,ctx){
   for(const i in S.props){const st=S.props[i];if(st.houses===5)ho++;else h+=st.houses;
     if(st.owner&&!S.players.find(p=>p.id===st.owner))throw new Error('dono invalido '+ctx);
     if(st.owner&&S.players.find(p=>p.id===st.owner).bk)throw new Error('dono falido '+ctx);}
-  if(S.houses+h!==32)throw new Error('casas '+S.houses+'+'+h+' '+ctx);
-  if(S.hotels+ho!==12)throw new Error('hoteis '+ctx);
+  if(S.houses+h!==S.houseMax)throw new Error('casas '+S.houses+'+'+h+' '+ctx);
+  if(S.hotels+ho!==S.hotelMax)throw new Error('hoteis '+ctx);
   S.players.forEach(p=>{if(!Number.isInteger(p.cash))throw new Error('cash nao inteiro '+p.cash+' '+ctx);
     if(p.cash<0&&!p.bk&&!S.loans.some(l=>l.borrower===p.id)&&!p.negEver)p.negEver=true; /* saldo negativo só via penalização de empréstimo */});
   S.loans.forEach(l=>{const b=S.players.find(p=>p.id===l.borrower);if(!b||b.bk)throw new Error('empréstimo de falido '+ctx);if(l.lender!=='bank'){const x=S.players.find(p=>p.id===l.lender);if(!x||x.bk)throw new Error('credor falido '+ctx)}if(l.rem<0)throw new Error('rem negativo')});

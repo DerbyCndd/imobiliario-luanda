@@ -23,7 +23,7 @@ npm test         # simula centenas de jogos + testa as salas
 
 ## Regras implementadas
 40 casas, 28 propriedades, 1500 Kz iniciais, 200 Kz na Partida, duplos / 3 duplos = Cadeia, Cadeia (duplo / 50 Kz / carta),
-**empréstimos** (banco 5%+2%/ronda ou entre jogadores, prestação por ronda, confisco de propriedade ou saldo negativo), compra e **leilão** com relógio, rendas (cor completa a dobrar), casas e hotéis (construção uniforme, 32/12), hipotecas,
+**empréstimos** (banco 5%+2%/ronda ou entre jogadores, prestação por ronda, confisco de propriedade ou saldo negativo), compra e **leilão** com relógio, rendas (cor completa a dobrar), casas e hotéis (construção uniforme, 32/12; com mais de 8 jogadores o banco tem mais: 4 casas e 1,5 hotéis por jogador), hipotecas,
 cartas de Sorte e Caixa Comunitária (16+16), **trocas**, dívidas, falência, vencedor, chat e reconexão.
 Regra opcional: multas e impostos acumulam no Parque Gratuito.
 
