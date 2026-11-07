@@ -1,0 +1,21 @@
+const E = require('./public/engine.js');
+let ok = true; const t = (c, m) => { console.log((c ? 'ok - ' : 'FALHOU - ') + m); if (!c) ok = false; };
+const S = E.newGame('T', 'a'); E.join(S, 'a', 'A'); E.join(S, 'b', 'B'); E.act(S, 'a', { type: 'start' });
+const [p0, p1] = S.players; const c = E.cur(S), o = c.id === p0.id ? p1 : p0;
+S.props[1].owner = o.id; o.cash = 1500;
+S.loans.push({ id: 1, lender: 'bank', borrower: o.id, principal: 100, rate: 5, n: 3, inst: 40, total: 105, rem: 105, miss: 1, grace: 2, pen: 'prop' });
+o.cash = 0; S.cur = S.players.indexOf(c) ; 
+// força o confisco: próxima vez de o
+S.turn.phase = 'end'; E.act(S, c.id, { type: 'endTurn' });
+t(S.props[1].owner === null && S.seized.includes(1), 'propriedade confiscada vai para a lista do banco');
+const me = E.cur(S); const other = S.players.find((p) => p !== me);
+S.turn.phase = 'roll';
+me.cash = 1500; const e1 = E.act(S, other.id, { type: 'auctionSeized', sq: 1 }); t(!!e1, 'só o jogador da vez pode leiloar');
+t(!E.act(S, me.id, { type: 'auctionSeized', sq: 1 }) && S.auction && S.turn.phase === 'auction', 'leilão arranca');
+t(!!E.act(S, other.id, { type: 'buySeized', sq: 1 }), 'não se compra durante o leilão');
+E.act(S, other.id, { type: 'bid', amount: 100 }); E.act(S, me.id, { type: 'pass' });
+t(S.props[1].owner === other.id && !S.seized.includes(1), 'vencedor fica com a propriedade');
+t(S.turn.phase === 'roll' && !S.auction, 'fase da vez restaurada');
+S.props[3].owner = null; S.seized.push(3); const before = me.cash;
+t(!E.act(S, me.id, { type: 'buySeized', sq: 3 }) && S.props[3].owner === me.id && me.cash === before - 60, 'compra directa ao banco');
+process.exit(ok ? 0 : 1);

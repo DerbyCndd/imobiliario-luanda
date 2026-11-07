@@ -354,8 +354,8 @@ button,.sq,.chip,.pchip{touch-action:manipulation}
 
 /* nomes das casas só quando há espaço (a carta completa abre ao tocar na casa) */
 @container (max-width:480px){
-  .sq .nm{font-size:0;letter-spacing:0}
-  .sq .nm i{font-size:max(11px,3.5cqw);line-height:1}
+  .sq .nm{font-size:max(5px,1.6cqw);letter-spacing:-.02em;line-height:1.05;overflow-wrap:anywhere;hyphens:auto}
+  .sq .nm i{font-size:max(9px,2.8cqw);line-height:1}
   .corner .nm i{font-size:max(17px,5.6cqw)}
   .sq .pr{font-size:max(7.5px,2.15cqw);font-weight:800}
   .sq .body{padding:.5cqw .2cqw 1.7cqw;justify-content:space-around}
@@ -378,3 +378,12 @@ button,.sq,.chip,.pchip{touch-action:manipulation}
   .sq .body{padding-bottom:1.8cqw}
   .nm{font-size:max(7px,1.15cqw)!important;overflow-wrap:break-word;hyphens:auto}
 }
+
+/* cartas de cada jogador, com o nome da casa visível */
+.chips .chip.named{width:auto;height:auto;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 3px;font-size:11px;line-height:1.2;font-weight:600;color:var(--txt);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:6px;max-width:100%}
+.chips .chip.named i{display:inline-block;width:8px;height:13px;flex:none;border:1px solid rgba(0,0,0,.7);border-radius:2px}
+.chips .chip.named.m{opacity:.45;text-decoration:line-through}
+.chips{gap:3px}
+
+.seized{margin:8px 0;padding:8px;border:1px dashed rgba(230,187,74,.55);border-radius:12px;background:rgba(230,187,74,.07)}
+.seized h3{font-size:12px;color:var(--gold);margin-bottom:4px}

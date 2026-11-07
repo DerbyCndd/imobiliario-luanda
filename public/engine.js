@@ -109,7 +109,7 @@
       v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false, turnTime: 60 }, tl: 0, tk: '',
       players: [], cur: 0, props: {}, houses: 32, hotels: 12,
       turn: { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 },
-      debts: [], auction: null, aq: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
+      debts: [], auction: null, aq: [], seized: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
       card: null, cardSeq: 0, decks: { chance: [], cc: [] }, winner: null,
     };
   }
@@ -137,7 +137,7 @@
     S.decks.cc = shuffle(CARDS.cc.map((_, i) => i));
     /* até 8 jogadores: 32 casas e 12 hotéis; acima disso o banco ganha 4 casas e 1,5 hotéis por jogador */
     S.houseMax = Math.max(32, 4 * S.players.length); S.hotelMax = Math.max(12, Math.ceil(1.5 * S.players.length));
-    S.houses = S.houseMax; S.hotels = S.hotelMax; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.trades = []; S.loans = []; S.lreq = []; S.lid = 0; S.winner = null;
+    S.houses = S.houseMax; S.hotels = S.hotelMax; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.seized = []; S.trades = []; S.loans = []; S.lreq = []; S.lid = 0; S.winner = null;
     S.cur = 0; S.phase = 'play';
     S.turn = { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 };
     log(S, 'O jogo começou! Primeiro a jogar: ' + cur(S).name + '.');
@@ -290,7 +290,9 @@
       const w = byId(S, A.bidder); w.cash -= A.bid; S.props[A.sq].owner = w.id;
       log(S, w.name + ' ganhou ' + BOARD[A.sq].n + ' por ' + money(A.bid) + '.');
     } else log(S, 'Ninguém licitou ' + BOARD[A.sq].n + '.');
+    if (A.bidder) S.seized = (S.seized || []).filter((i) => i !== A.sq);
     S.auction = null;
+    if (A.prev && !S.aq.length) { S.turn.phase = A.prev; return; }
     if (S.aq.length) { startAuction(S, S.aq.shift()); return; }
     S.turn.phase = 'moving'; flow(S);
   }
@@ -429,7 +431,8 @@
         const i = mine[0], st = S.props[i], value = st.mort ? BOARD[i].p / 2 : BOARD[i].p;
         if (st.houses === 5) S.hotels++; else S.houses += st.houses;
         st.houses = 0;
-        st.owner = L.lender === 'bank' ? null : L.lender; if (L.lender === 'bank') st.mort = false;
+        st.owner = L.lender === 'bank' ? null : L.lender;
+        if (L.lender === 'bank') { st.mort = false; S.seized = S.seized || []; if (!S.seized.includes(i)) S.seized.push(i); log(S, '🏦 ' + BOARD[i].n + ' ficou à venda no banco (comprar ou leiloar).'); }
         L.rem = Math.max(0, L.rem - value); L.miss = 0;
         log(S, '🏚️ ' + BOARD[i].n + ' foi confiscada a ' + p.name + ' (abate ' + money(value) + ' à dívida).');
         if (L.rem <= 0) { dropLoan(S, L); log(S, '✅ Empréstimo liquidado com a propriedade confiscada.'); }
@@ -545,6 +548,23 @@
       case 'decline':
         if (!isCur || T.phase !== 'buy') return 'Não podes recusar agora.';
         log(S, me.name + ' não quis comprar.'); startAuction(S, me.pos); return null;
+      case 'buySeized': {
+        const i = a.sq | 0, st = S.props[i];
+        if (S.auction) return 'Há um leilão em curso.';
+        if (S.debts.length) return 'Resolve primeiro as dívidas pendentes.';
+        if (!st || st.owner !== null || !(S.seized || []).includes(i)) return 'Essa propriedade não está à venda no banco.';
+        if (me.cash < BOARD[i].p) return 'Dinheiro insuficiente.';
+        me.cash -= BOARD[i].p; st.owner = me.id; st.mort = false; S.seized = S.seized.filter((x) => x !== i);
+        log(S, '🏦 ' + me.name + ' comprou ao banco a propriedade confiscada ' + BOARD[i].n + ' por ' + money(BOARD[i].p) + '.'); return null;
+      }
+      case 'auctionSeized': {
+        const i = a.sq | 0, st = S.props[i];
+        if (!isCur || (T.phase !== 'roll' && T.phase !== 'end')) return 'Só podes pôr a leilão na tua vez (antes de lançar os dados ou depois de jogar).';
+        if (S.auction || S.debts.length) return 'Há um leilão ou dívida em curso.';
+        if (!st || st.owner !== null || !(S.seized || []).includes(i)) return 'Essa propriedade não está à venda no banco.';
+        log(S, '🔨 ' + me.name + ' pediu leilão da propriedade confiscada ' + BOARD[i].n + '.');
+        const prev = T.phase; startAuction(S, i); S.auction.prev = prev; return null;
+      }
       case 'bid': {
         const A = S.auction; if (!A) return 'Não há leilão.';
         const amt = Math.floor(+a.amount);

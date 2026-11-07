@@ -269,7 +269,7 @@ function playersHtml() {
   const isHost = pid === S.hostPid, c = E.cur(S);
   return S.players.map((p) => {
     const owned = Object.keys(S.props).map(Number).filter((i) => S.props[i].owner === p.id);
-    const chips = owned.map((i) => `<span class="chip ${S.props[i].mort ? 'm' : ''}" data-sq="${i}" title="${esc(B[i].n)}" style="background:${propColor(i)}"></span>`).join('');
+    const chips = owned.map((i) => `<span class="chip named ${S.props[i].mort ? 'm' : ''}" data-sq="${i}" title="${esc(B[i].n)}${S.props[i].mort ? ' (hipotecada)' : ''}"><i style="background:${propColor(i)}"></i>${esc(B[i].n)}${S.props[i].houses ? ' ' + (S.props[i].houses === 5 ? '🏨' : '🏠' + S.props[i].houses) : ''}</span>`).join('');
     const nl = S.loans.filter((l) => l.borrower === p.id).length;
     return `<div class="pcard ${p.id === c.id && S.phase === 'play' ? 'turn' : ''} ${p.bk ? 'bk' : ''}">
       <div class="av" style="background:${pcol(p)}">${tokenOf(p)}</div>
@@ -278,8 +278,19 @@ function playersHtml() {
       ${isHost && p.id !== pid && !p.bk ? `<button class="sm ghost" data-act="kick" data-pid="${p.id}" data-confirm="Remover ${esc(p.name)} do jogo?">✖</button>` : ''}</div>`;
   }).join('');
 }
+function seizedHtml() {
+  const list = (S.seized || []).filter((i) => S.props[i] && S.props[i].owner === null);
+  if (!list.length) return '';
+  const m = me(), c = E.cur(S);
+  const canAuc = !m.bk && c.id === pid && !S.auction && !S.debts.length && (S.turn.phase === 'roll' || S.turn.phase === 'end');
+  const canBuy = !m.bk && !S.auction && !S.debts.length;
+  return `<div class="seized"><h3>🏚️ Confiscadas (à venda no banco)</h3>` + list.map((i) => `<div class="prow"><span class="pc" style="background:${propColor(i)}"></span>
+    <div class="pn"><a href="#" data-sq="${i}">${esc(B[i].n)}</a><small>${kz(B[i].p)}</small></div>
+    <button class="sm good" data-act="buySeized" data-sq="${i}" ${canBuy && m.cash >= B[i].p ? '' : 'disabled'}>Comprar</button>
+    <button class="sm alt" data-act="auctionSeized" data-sq="${i}" ${canAuc ? '' : 'disabled'} title="Só na tua vez">Leilão</button></div>`).join('') + '</div>';
+}
 function bankHtml() {
-  return `<div class="bankinfo"><span>🏠 Casas <b>${S.houses}</b></span><span>🏨 Hotéis <b>${S.hotels}</b></span>${S.settings.pot ? `<span>🅿️ <b>${kz(S.pot)}</b></span>` : ''}</div>`;
+  return seizedHtml() + `<div class="bankinfo"><span>🏠 Casas <b>${S.houses}</b></span><span>🏨 Hotéis <b>${S.hotels}</b></span>${S.settings.pot ? `<span>🅿️ <b>${kz(S.pot)}</b></span>` : ''}</div>`;
 }
 function myPropsHtml() {
   const m = me();
