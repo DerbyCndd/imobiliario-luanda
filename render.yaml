@@ -14,7 +14,12 @@ services:
         sync: false
       - key: JUDGE_MODEL
         sync: false
-      # Chamada de voz em redes restritivas (opcional): conta grátis em metered.ca
+      # Chamada de voz em redes móveis/restritas: precisa de TURN. Opção A (recomendada, grátis): Cloudflare Realtime TURN
+      - key: CF_TURN_KEY_ID
+        sync: false
+      - key: CF_TURN_API_TOKEN
+        sync: false
+      # Opção B: conta grátis em metered.ca
       - key: METERED_DOMAIN
         sync: false
       - key: METERED_API_KEY

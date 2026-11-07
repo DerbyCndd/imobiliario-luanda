@@ -8,7 +8,7 @@
   const STY = {
     equilibrado: { res: 150, aggr: 1.0, accept: 1.0, build: 200, trade: 1, lend: 1 },
     agressivo: { res: 60, aggr: 1.25, accept: 0.9, build: 80, trade: 1, lend: 0.6 },
-    cauteloso: { res: 300, aggr: 0.85, accept: 1.15, build: 350, trade: 1, lend: 1.3 },
+    cauteloso: { res: 180, aggr: 0.95, accept: 1.15, build: 350, trade: 1, lend: 1.3 },
     negociador: { res: 120, aggr: 1.0, accept: 0.95, build: 150, trade: 2, lend: 1 },
   };
   const DEFENSES = [

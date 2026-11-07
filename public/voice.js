@@ -136,6 +136,7 @@
     for (const id of [...peers.keys()]) closePeer(id);
     V.send({ t: 'vjoin' });
   };
+  V.setMode = (m) => { if (V.mode !== m) { V.mode = m; V.onChange(); } };
   V.setIce = (servers) => { if (Array.isArray(servers) && servers.length) ICE = { iceServers: servers, iceCandidatePoolSize: 2 }; };
   /* alguns navegadores (iOS) só tocam áudio depois de um toque: tenta de novo em qualquer toque */
   V.unlock = () => { peers.forEach((p) => { if (p.audio.paused && p.audio.srcObject) p.audio.play().then(() => { if (V.blocked) { V.blocked = false; V.onChange(); } }).catch(() => {}); }); };

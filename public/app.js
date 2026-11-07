@@ -19,7 +19,17 @@ let ui = { trade: null, lastSig: '', cardSeq: 0, diceSeq: -1, tab: 'props', show
 /* ====================================================================== REDE (WebSocket) */
 function setNet(m) { const n = $('#net'); n.textContent = m || ''; n.classList.toggle('hidden', !m); }
 function toast(m, ms) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), ms || 3200); }
-function sess() { ssSet('imobl_sess', JSON.stringify({ code: roomCode })); lsSet('imobl_last', JSON.stringify({ code: roomCode, pid })); }
+const seatsGet = () => { try { return JSON.parse(lsGet('imobl_seats') || '{}') || {}; } catch (e) { return {}; } };
+function seatSave() {
+  const s = seatsGet(); delete s[roomCode]; s[roomCode] = pid; /* reinsere no fim: os mais recentes ficam */
+  const keys = Object.keys(s); keys.slice(0, Math.max(0, keys.length - 20)).forEach((k) => delete s[k]);
+  lsSet('imobl_seats', JSON.stringify(s));
+}
+function seatRestore() { /* ao entrar numa sala já conhecida, volta a ser a mesma pessoa */
+  const p = seatsGet()[roomCode];
+  if (p && p !== pid) { pid = p; ssSet('imobl_pid', pid); Voice.selfId = pid; }
+}
+function sess() { seatSave(); ssSet('imobl_sess', JSON.stringify({ code: roomCode })); lsSet('imobl_last', JSON.stringify({ code: roomCode, pid })); }
 const wsUrl = () => (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
 function enter(create) { wantCreate = !!create; leaving = false; attempts = 0; connect(); }
@@ -33,6 +43,7 @@ function connect() {
   w.onopen = () => {
     clearTimeout(wd); attempts = 0; setNet(''); lastMsg = Date.now();
     Voice.selfId = pid; Voice.send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
+    if (!(wantCreate && !S)) seatRestore();
     w.send(JSON.stringify(wantCreate && !S ? { t: 'create', pid, name: myName } : { t: 'join', code: roomCode, pid, name: myName }));
     Voice.resume();
   };
@@ -41,7 +52,8 @@ function connect() {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 'pong') return;
     if (m.t === 's') { S = m.s; roomCode = S.code; wantCreate = false; sess(); render(); }
-    else if (m.t === 'ice') Voice.setIce(m.servers);
+    else if (m.t === 'adopt') { pid = m.pid; ssSet('imobl_pid', pid); Voice.selfId = pid; toast('Voltaste ao teu lugar na partida.', 3500); }
+    else if (m.t === 'ice') { Voice.setIce(m.servers); Voice.setMode(m.mode); }
     else if (m.t === 'vreset') Voice.reset(m.pid);
     else if (m.t === 'voice') Voice.setList(m.list);
     else if (m.t === 'vsig') Voice.signal(m.from, m.d);
@@ -107,7 +119,7 @@ function mediaBarHtml() {
   return `<div class="mediabar"><button class="ghost sm" data-act="sfx" title="Ligar/desligar sons">${SFX.isMuted() ? '🔇 Sons' : '🔊 Sons'}</button>`
     + (V.joined ? `<button class="${V.muted ? 'ghost' : 'good'} sm" data-act="vmute">${V.muted ? '🔇 Microfone desligado' : '🎙️ Microfone ligado'}</button><button class="ghost sm" data-act="vdiag">🔍 Diagnóstico</button><button class="ghost sm" data-act="vleave">📞 Sair da voz</button>`
       : '<button class="alt sm" data-act="vjoin">🎙️ Entrar na chamada de voz</button>') + '</div>'
-    + (V.list.length ? `<p class="hint vnames">🎧 Na chamada: ${V.list.map((id) => { const st = id === pid ? '' : V.joined ? ' ' + ({ ligado: '🟢', 'a ligar': '🟡', 'instável': '🟠', falhou: '🔴' }[V.state[id]] || '🟡') : ''; return esc(anyName(id) || '?') + (id === pid ? ' (tu)' : st); }).join(', ')}</p>${V.joined && V.list.some((id) => id !== pid && V.state[id] === 'falhou') ? '<p class="hint" style="color:#ff7b80">🔴 Algumas ligações falharam (rede restritiva). O servidor precisa de um TURN para chegar a toda a gente.</p>' : ''}${V.blocked ? '<p class="hint" style="color:#ffb347">🔈 O navegador bloqueou o som: toca em qualquer sítio do ecrã.</p>' : ''}` : '')
+    + (V.list.length ? `<p class="hint vnames">🎧 Na chamada: ${V.list.map((id) => { const st = id === pid ? '' : V.joined ? ' ' + ({ ligado: '🟢', 'a ligar': '🟡', 'instável': '🟠', falhou: '🔴' }[V.state[id]] || '🟡') : ''; return esc(anyName(id) || '?') + (id === pid ? ' (tu)' : st); }).join(', ')}</p>${V.joined && V.list.some((id) => id !== pid && V.state[id] === 'falhou') ? '<p class="hint" style="color:#ff7b80">🔴 Algumas ligações falharam (rede restritiva). ' + (V.mode === 'none' ? 'Este servidor <b>ainda não tem servidor TURN</b>: o anfitrião/administrador tem de o configurar (ver README). Entretanto, mudar de Wi-Fi para dados móveis (ou vice-versa) costuma resolver.' : 'Tenta mudar de Wi-Fi para dados móveis (ou vice-versa).') + '</p>' : ''}${V.blocked ? '<p class="hint" style="color:#ffb347">🔈 O navegador bloqueou o som: toca em qualquer sítio do ecrã.</p>' : ''}` : '')
     + (V.error ? `<p class="hint" style="color:#ff7b80">${esc(V.error)}</p>` : '');
 }
 /* efeitos sonoros: esperam que os dados/peças assentem antes de tocar */

@@ -27,4 +27,12 @@ for(let i=0;i<60&&S().turn.phase!=='buy'&&S().phase==='play';i++){const w=W();co
 if(S().turn.phase==='buy'){tx(W(),{t:'act',a:{type:'decline'}});ok(S().auction&&S().auction.left===20,'leilão iniciado');R.tickAll();const clk=A.out.filter(m=>m.t==='clk').pop();ok(clk&&clk.left===19,'relógio do leilão avança e é enviado em mensagem leve');}
 tx(A,{t:'ping'});ok(A.out.some(m=>m.t==='pong'),'ping recebe pong (ligação viva)');
 tx(A,{t:'vjoin'});tx(B2,{t:'vjoin'});B2.out.length=0;tx(A,{t:'vjoin'});ok(B2.out.some(m=>m.t==='vreset'&&m.pid==='pa'),'reconexão de voz avisa os outros (vreset)');
+// regresso: mesmo nome, novo navegador, depois da ronda 2 -> retoma o lugar (não vira espectador)
+{const r=R.rooms.get(code);r.S.round=5;const nPl=r.S.players.length,nSp=r.S.specs.length;
+const old=r.conns.get('pb');old.close();ok(r.S.players.find(p=>p.id==='pb').connected===false,'jogador saiu da partida');
+const N=mk();tx(N,{t:'join',code,pid:'novo123',name:'bruno'});
+ok(N.out.some(m=>m.t==='adopt'&&m.pid==='pb'),'servidor devolve o lugar antigo (adopt)');
+ok(r.S.players.length===nPl&&r.S.specs.length===nSp&&r.S.players.find(p=>p.id==='pb').connected===true,'retoma o lugar: sem espectador novo e ligado outra vez');
+const Z=mk();tx(Z,{t:'join',code,pid:'intruso',name:'Bruno'});ok(!Z.out.some(m=>m.t==='adopt')&&r.S.specs.some(x=>x.id==='intruso'),'com o lugar ocupado/ligado ninguém o rouba (fica a assistir)');
+r.S.round=1;}
 console.log('TUDO OK');process.exit(0);

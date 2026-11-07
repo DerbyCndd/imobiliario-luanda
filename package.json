@@ -7,7 +7,7 @@
     "dev": "node server.js --dev",
     "build": "next build",
     "start": "node server.js",
-    "test": "node test.js && node test-rooms.js && node test-loans.js && node test-timer.js && node test-seized.js && node test-judge.js && node judge/train.js && node test-chaos.js 30",
+    "test": "node test.js && node test-rooms.js && node test-loans.js && node test-timer.js && node test-seized.js && node test-turn.js && node test-judge.js && node judge/train.js && node test-chaos.js 30",
     "sim": "node sim-bots.js 60 4 250",
     "judge:train": "node judge/train.js --tune"
   },
