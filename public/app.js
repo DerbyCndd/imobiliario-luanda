@@ -9,6 +9,7 @@ const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
+let lastMsg = Date.now();
 let S = null, ws = null, roomCode = '', retryT = null, leaving = false, wantCreate = false, attempts = 0, local = false;
 let pid = ssGet('imobl_pid') || (Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4));
 ssSet('imobl_pid', pid);
@@ -30,15 +31,18 @@ function connect() {
   const w = (ws = new WebSocket(wsUrl()));
   const wd = setTimeout(() => { if (w.readyState !== 1) { try { w.close(); } catch (e) {} } }, 8000);
   w.onopen = () => {
-    clearTimeout(wd); attempts = 0; setNet('');
+    clearTimeout(wd); attempts = 0; setNet(''); lastMsg = Date.now();
     Voice.selfId = pid; Voice.send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
     w.send(JSON.stringify(wantCreate && !S ? { t: 'create', pid, name: myName } : { t: 'join', code: roomCode, pid, name: myName }));
     Voice.resume();
   };
   w.onmessage = (ev) => {
+    lastMsg = Date.now();
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.t === 'pong') return;
     if (m.t === 's') { S = m.s; roomCode = S.code; wantCreate = false; sess(); render(); }
     else if (m.t === 'ice') Voice.setIce(m.servers);
+    else if (m.t === 'vreset') Voice.reset(m.pid);
     else if (m.t === 'voice') Voice.setList(m.list);
     else if (m.t === 'vsig') Voice.signal(m.from, m.d);
     else if (m.t === 'clk' && S) { S.tl = m.tl; if (S.auction) S.auction.left = m.left; if (S.case) S.case.left = m.cl; updClock(); }
@@ -47,6 +51,21 @@ function connect() {
   w.onclose = () => { clearTimeout(wd); if (w === ws) retry(); };
   w.onerror = () => {};
 }
+/* ligação viva: ping a cada 15 s; se o servidor não responde em 40 s (telemóvel adormeceu, rede mudou) reconecta */
+setInterval(() => {
+  if (!S || leaving || local) return;
+  if (!ws || ws.readyState !== 1) return;
+  if (Date.now() - lastMsg > 40000) { connect(); return; }
+  try { ws.send(JSON.stringify({ t: 'ping' })); } catch (e) {}
+}, 15000);
+function wake() {
+  if (!S || leaving || local) return;
+  if (!ws || ws.readyState !== 1 || Date.now() - lastMsg > 25000) connect();
+  else { try { ws.send(JSON.stringify({ t: 'ping' })); } catch (e) {} }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+window.addEventListener('online', wake);
+window.addEventListener('pageshow', wake);
 function retry() {
   if (leaving) return;
   attempts++;
@@ -86,7 +105,7 @@ Voice.onChange = () => { ui.lastSig = ''; if (S) render(); };
 function mediaBarHtml() {
   const V = Voice, names = V.list.map(anyName).filter(Boolean);
   return `<div class="mediabar"><button class="ghost sm" data-act="sfx" title="Ligar/desligar sons">${SFX.isMuted() ? '🔇 Sons' : '🔊 Sons'}</button>`
-    + (V.joined ? `<button class="${V.muted ? 'ghost' : 'good'} sm" data-act="vmute">${V.muted ? '🔇 Microfone desligado' : '🎙️ Microfone ligado'}</button><button class="ghost sm" data-act="vleave">📞 Sair da voz</button>`
+    + (V.joined ? `<button class="${V.muted ? 'ghost' : 'good'} sm" data-act="vmute">${V.muted ? '🔇 Microfone desligado' : '🎙️ Microfone ligado'}</button><button class="ghost sm" data-act="vdiag">🔍 Diagnóstico</button><button class="ghost sm" data-act="vleave">📞 Sair da voz</button>`
       : '<button class="alt sm" data-act="vjoin">🎙️ Entrar na chamada de voz</button>') + '</div>'
     + (V.list.length ? `<p class="hint vnames">🎧 Na chamada: ${V.list.map((id) => { const st = id === pid ? '' : V.joined ? ' ' + ({ ligado: '🟢', 'a ligar': '🟡', 'instável': '🟠', falhou: '🔴' }[V.state[id]] || '🟡') : ''; return esc(anyName(id) || '?') + (id === pid ? ' (tu)' : st); }).join(', ')}</p>${V.joined && V.list.some((id) => id !== pid && V.state[id] === 'falhou') ? '<p class="hint" style="color:#ff7b80">🔴 Algumas ligações falharam (rede restritiva). O servidor precisa de um TURN para chegar a toda a gente.</p>' : ''}${V.blocked ? '<p class="hint" style="color:#ffb347">🔈 O navegador bloqueou o som: toca em qualquer sítio do ecrã.</p>' : ''}` : '')
     + (V.error ? `<p class="hint" style="color:#ff7b80">${esc(V.error)}</p>` : '');
@@ -606,6 +625,15 @@ document.addEventListener('click', (ev) => {
     case 'sfx': SFX.setMuted(!SFX.isMuted()); ui.lastSig = ''; render(); break;
     case 'vjoin': Voice.join(); break;
     case 'vleave': Voice.leave(); break;
+    case 'vdiag': {
+      openModal('<h2>🔍 Diagnóstico da voz</h2><p class="hint">A recolher dados…</p>');
+      Voice.stats().then((st) => {
+        const ids = Object.keys(st);
+        const rows = ids.length ? ids.map((id) => { const x = st[id]; return '<tr><td>' + esc(anyName(id) || '?') + '</td><td>' + (x.rx > 2000 ? '✅ ouves' : '❌ não ouves') + '</td><td>' + (x.tx > 2000 ? '✅ ouve-te' : '❌ não te ouve') + '</td><td>' + (x.pair || '—') + '</td></tr>'; }).join('') : '<tr><td colspan="4">Sem ligações activas (ninguém mais na chamada ou ainda a ligar).</td></tr>';
+        $('#modal .box').firstChild.nextSibling.outerHTML = '<table class="diag"><tr><th>Pessoa</th><th>Áudio recebido</th><th>Áudio enviado</th><th>Latência</th></tr>' + rows + '</table><p class="hint">Se aparece ❌ em ambos há um problema de rede (precisa de TURN). Se só não te ouvem, verifica o teu microfone (🎙️ ligado) e a permissão do navegador. Se só não ouves, verifica o volume e se não estás em modo silencioso.</p>';
+      });
+      break;
+    }
     case 'vmute': Voice.toggleMute(); break;
     case 'report': { const why = prompt('Motivo da denúncia (opcional):', ''); if (why === null) break; dispatch({ type: 'report', deal: +t.dataset.id, reason: why }); break; }
     case 'vote': dispatch({ type: 'vote', v: t.dataset.v }); break;

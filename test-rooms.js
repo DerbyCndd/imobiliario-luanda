@@ -25,4 +25,6 @@ R.rooms.get(code).S.players.pop();
 // leilão + relógio
 for(let i=0;i<60&&S().turn.phase!=='buy'&&S().phase==='play';i++){const w=W();const ph=S().turn.phase;if(ph==='roll')tx(w,{t:'act',a:{type:'roll'}});else if(ph==='end')tx(w,{t:'act',a:{type:'endTurn'}});else break}
 if(S().turn.phase==='buy'){tx(W(),{t:'act',a:{type:'decline'}});ok(S().auction&&S().auction.left===20,'leilão iniciado');R.tickAll();const clk=A.out.filter(m=>m.t==='clk').pop();ok(clk&&clk.left===19,'relógio do leilão avança e é enviado em mensagem leve');}
+tx(A,{t:'ping'});ok(A.out.some(m=>m.t==='pong'),'ping recebe pong (ligação viva)');
+tx(A,{t:'vjoin'});tx(B2,{t:'vjoin'});B2.out.length=0;tx(A,{t:'vjoin'});ok(B2.out.some(m=>m.t==='vreset'&&m.pid==='pa'),'reconexão de voz avisa os outros (vreset)');
 console.log('TUDO OK');process.exit(0);
