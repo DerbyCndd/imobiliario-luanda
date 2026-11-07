@@ -443,6 +443,7 @@ function rulesHtml() {
   <p><b>Hipotecas:</b> recebes metade do preço; resgatar custa +10%. Sem renda enquanto hipotecada.</p>
   <p><b>Trocas:</b> propriedades, dinheiro e cartas a qualquer momento (sem construções no grupo).</p>
   <p><b>💳 Empréstimos:</b> o banco empresta 50–1000 Kz (juros 5% + 2% por ronda de prazo). Também podes pedir a outro jogador com juros acordados. A prestação paga-se no início da tua vez; se falhares ${E.LOAN_GRACE} vezes seguidas aplica-se a penalização escolhida: <b>confisco da propriedade mais barata</b> ou <b>saldo negativo</b>.</p>
+  <p><b>🏚️ Propriedades confiscadas:</b> as confiscadas pelo banco ficam à venda: qualquer jogador pode comprá-las ao preço de tabela, ou o jogador da vez pode pô-las a <b>leilão</b>.</p>
   <p><b>Falência:</b> se não pagas uma dívida: ao jogador a quem deves vai tudo; ao banco, as propriedades vão a leilão.</p></div>`;
 }
 function tradeModal() {
@@ -542,6 +543,7 @@ document.addEventListener('keydown', (ev) => {
 
 /* ---------- ecrã inicial ---------- */
 $('#name').value = myName;
+$('#homeRules').innerHTML = rulesHtml();
 const urlRoom = (new URLSearchParams(location.search).get('sala') || '').toUpperCase();
 if (urlRoom) $('#code').value = urlRoom;
 function needName() { myName = $('#name').value.trim().slice(0, 16); if (!myName) { toast('Escreve o teu nome primeiro.'); $('#name').focus(); return false; } lsSet('imobl_name', myName); return true; }

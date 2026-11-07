@@ -10,6 +10,7 @@ export const SHELL = `
     <div class="row"><button id="bCreate">🎲 Criar sala</button><button id="bResume" class="alt hidden">↩️ Voltar à última sala</button></div></div>
   <div class="card"><h2>Entrar numa sala</h2>
     <div class="row"><input id="code" maxlength="5" placeholder="CÓDIGO" style="text-transform:uppercase;letter-spacing:4px;font-weight:800"><button id="bJoin" class="alt">Entrar</button></div></div>
+  <div class="card" id="homeRules"></div>
   <p class="hint" style="color:#e8dcc0;text-align:center">Jogo online entre amigos, sem registo. Regras do tabuleiro clássico.</p>
 </div>
 <div id="lobby" class="screen hidden"></div>
