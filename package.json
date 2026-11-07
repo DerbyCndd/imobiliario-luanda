@@ -7,7 +7,7 @@
     "dev": "node server.js --dev",
     "build": "next build",
     "start": "node server.js",
-    "test": "node test.js && node test-rooms.js && node test-loans.js && node test-timer.js && node test-seized.js"
+    "test": "node test.js && node test-rooms.js && node test-loans.js && node test-timer.js && node test-seized.js && node test-judge.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {

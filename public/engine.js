@@ -8,45 +8,45 @@
   const P = (n, g, p, r, h) => ({ t: 'prop', n, g, p, r, h });
   const BOARD = [
     { t: 'go', n: 'Partida' },
-    P('Cazenga', 'brown', 60, [2, 10, 30, 90, 160, 250], 50),
+    P('Cazenga', 'brown', 60, [4, 20, 60, 180, 320, 450], 50),
     { t: 'cc', n: 'Caixa Comunitária' },
-    P('Sambizanga', 'brown', 60, [4, 20, 60, 180, 320, 450], 50),
+    P('Sambizanga', 'brown', 60, [6, 30, 90, 270, 400, 550], 50),
     { t: 'tax', n: 'Imposto de Rendimento', amt: 200 },
     { t: 'rail', n: 'Linha de Luanda', p: 200 },
-    P('Rangel', 'lblue', 100, [6, 30, 90, 270, 400, 550], 50),
+    P('Rangel', 'lblue', 100, [8, 40, 100, 300, 450, 600], 50),
     { t: 'chance', n: 'Sorte' },
-    P('Viana', 'lblue', 100, [6, 30, 90, 270, 400, 550], 50),
-    P('Cacuaco', 'lblue', 120, [8, 40, 100, 300, 450, 600], 50),
+    P('Viana', 'lblue', 100, [8, 40, 100, 300, 450, 600], 50),
+    P('Cacuaco', 'lblue', 120, [10, 50, 150, 450, 625, 750], 50),
     { t: 'jail', n: 'Cadeia / Visita' },
-    P('Benfica', 'pink', 140, [10, 50, 150, 450, 625, 750], 100),
+    P('Benfica', 'pink', 140, [12, 60, 180, 500, 700, 900], 100),
     { t: 'util', n: 'ENDE Electricidade', p: 150 },
-    P('Camama', 'pink', 140, [10, 50, 150, 450, 625, 750], 100),
-    P('Golfe', 'pink', 160, [12, 60, 180, 500, 700, 900], 100),
+    P('Camama', 'pink', 140, [12, 60, 180, 500, 700, 900], 100),
+    P('Golfe', 'pink', 160, [14, 70, 200, 550, 750, 950], 100),
     { t: 'rail', n: 'Linha de Benguela', p: 200 },
-    P('Maianga', 'orange', 180, [14, 70, 200, 550, 750, 950], 100),
+    P('Maianga', 'orange', 180, [16, 80, 220, 600, 800, 1000], 100),
     { t: 'cc', n: 'Caixa Comunitária' },
-    P('Alvalade', 'orange', 180, [14, 70, 200, 550, 750, 950], 100),
-    P('Maculusso', 'orange', 200, [16, 80, 220, 600, 800, 1000], 100),
+    P('Alvalade', 'orange', 180, [16, 80, 220, 600, 800, 1000], 100),
+    P('Maculusso', 'orange', 200, [18, 90, 250, 700, 875, 1050], 100),
     { t: 'park', n: 'Parque Gratuito' },
-    P('Miramar', 'red', 220, [18, 90, 250, 700, 875, 1050], 150),
+    P('Miramar', 'red', 220, [20, 100, 300, 750, 925, 1100], 150),
     { t: 'chance', n: 'Sorte' },
-    P('Prenda', 'red', 220, [18, 90, 250, 700, 875, 1050], 150),
-    P('Kinaxixi', 'red', 240, [20, 100, 300, 750, 925, 1100], 150),
+    P('Prenda', 'red', 220, [20, 100, 300, 750, 925, 1100], 150),
+    P('Kinaxixi', 'red', 240, [22, 110, 330, 800, 975, 1150], 150),
     { t: 'rail', n: 'Linha de Moçâmedes', p: 200 },
-    P('Ingombota', 'yellow', 260, [22, 110, 330, 800, 975, 1150], 150),
-    P('Baía de Luanda', 'yellow', 260, [22, 110, 330, 800, 975, 1150], 150),
+    P('Ingombota', 'yellow', 260, [24, 120, 360, 850, 1025, 1200], 150),
+    P('Baía de Luanda', 'yellow', 260, [24, 120, 360, 850, 1025, 1200], 150),
     { t: 'util', n: 'EPAL Águas', p: 150 },
-    P('Ilha do Cabo', 'yellow', 280, [24, 120, 360, 850, 1025, 1200], 150),
+    P('Ilha do Cabo', 'yellow', 280, [26, 130, 390, 900, 1100, 1275], 150),
     { t: 'gojail', n: 'Vá para a Cadeia' },
-    P('Talatona', 'green', 300, [26, 130, 390, 900, 1100, 1275], 200),
-    P('Belas', 'green', 300, [26, 130, 390, 900, 1100, 1275], 200),
+    P('Talatona', 'green', 300, [28, 150, 450, 1000, 1200, 1400], 200),
+    P('Belas', 'green', 300, [28, 150, 450, 1000, 1200, 1400], 200),
     { t: 'cc', n: 'Caixa Comunitária' },
-    P('Kilamba', 'green', 320, [28, 150, 450, 1000, 1200, 1400], 200),
+    P('Kilamba', 'green', 320, [32, 170, 500, 1100, 1300, 1500], 200),
     { t: 'rail', n: 'Linha de Malanje', p: 200 },
     { t: 'chance', n: 'Sorte' },
-    P('Marginal', 'dblue', 350, [35, 175, 500, 1100, 1300, 1500], 200),
+    P('Marginal', 'dblue', 350, [40, 200, 550, 1200, 1400, 1600], 200),
     { t: 'tax', n: 'Imposto de Luxo', amt: 100 },
-    P('Mussulo', 'dblue', 400, [50, 200, 600, 1400, 1700, 2000], 200),
+    P('Mussulo', 'dblue', 400, [55, 250, 650, 1500, 1800, 2100], 200),
   ];
   const GROUPS = {};
   BOARD.forEach((s, i) => { if (s.g) (GROUPS[s.g] = GROUPS[s.g] || []).push(i); });
@@ -106,8 +106,8 @@
 
   function newGame(code, hostPid) {
     return {
-      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false, turnTime: 60 }, tl: 0, tk: '',
-      players: [], cur: 0, props: {}, houses: 32, hotels: 12,
+      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false, turnTime: 60, limitHouses: true, lateJoin: true }, tl: 0, tk: '',
+      players: [], specs: [], round: 1, deals: [], did: 0, case: null, cid: 0, verdict: null, cur: 0, props: {}, houses: 32, hotels: 12,
       turn: { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 },
       debts: [], auction: null, aq: [], seized: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
       card: null, cardSeq: 0, decks: { chance: [], cc: [] }, winner: null,
@@ -118,7 +118,26 @@
     name = String(name || '').trim().slice(0, 16) || 'Jogador';
     let p = byId(S, pid);
     if (p) { p.connected = true; if (S.phase === 'lobby') p.name = name; return null; }
-    if (S.phase !== 'lobby') return 'O jogo já começou.';
+    S.specs = S.specs || [];
+    const sp = S.specs.find((x) => x.id === pid);
+    if (sp) { sp.connected = true; return null; }
+    if (S.phase !== 'lobby') {
+      /* partida a decorrer: entra a meio nas 2 primeiras rondas; depois só assiste */
+      if (S.phase === 'play' && (S.round || 1) <= 2 && S.settings.lateJoin !== false && S.players.length < 12) {
+        const taken = S.players.map((x) => x.token);
+        if (token == null || taken.includes(token) || token < 0 || token >= 12) token = TOKENS.findIndex((_, i) => !taken.includes(i));
+        S.players.push({ id: pid, name, token, connected: true, cash: S.settings.cash, pos: 0, jail: false, jt: 0, jc: [], bk: false, miss: 0, auto: false });
+        if (S.settings.limitHouses !== false) {
+          const hm = Math.max(32, 4 * S.players.length), tm = Math.max(12, Math.ceil(1.5 * S.players.length));
+          S.houses += hm - S.houseMax; S.hotels += tm - S.hotelMax; S.houseMax = hm; S.hotelMax = tm;
+        }
+        log(S, '🎉 ' + name + ' entrou na partida a meio (ronda ' + S.round + ') com ' + money(S.settings.cash) + '.');
+        return null;
+      }
+      if (S.specs.length >= 40) return 'Há demasiados espectadores nesta sala.';
+      S.specs.push({ id: pid, name, connected: true });
+      return null;
+    }
     if (S.players.length >= 12) return 'A sala está cheia (máximo 12 jogadores).';
     const taken = S.players.map((x) => x.token);
     if (token == null || taken.includes(token) || token < 0 || token >= 12) token = TOKENS.findIndex((_, i) => !taken.includes(i));
@@ -136,7 +155,10 @@
     S.decks.chance = shuffle(CARDS.chance.map((_, i) => i));
     S.decks.cc = shuffle(CARDS.cc.map((_, i) => i));
     /* até 8 jogadores: 32 casas e 12 hotéis; acima disso o banco ganha 4 casas e 1,5 hotéis por jogador */
-    S.houseMax = Math.max(32, 4 * S.players.length); S.hotelMax = Math.max(12, Math.ceil(1.5 * S.players.length));
+    S.round = 1; S.deals = []; S.did = 0; S.case = null; S.verdict = null;
+    /* sem limite: o banco "tem" casas de sobra (9999) */
+    S.houseMax = S.settings.limitHouses === false ? 9999 : Math.max(32, 4 * S.players.length);
+    S.hotelMax = S.settings.limitHouses === false ? 9999 : Math.max(12, Math.ceil(1.5 * S.players.length));
     S.houses = S.houseMax; S.hotels = S.hotelMax; S.pot = 0; S.debts = []; S.auction = null; S.aq = []; S.seized = []; S.trades = []; S.loans = []; S.lreq = []; S.lid = 0; S.winner = null;
     S.cur = 0; S.phase = 'play';
     S.turn = { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 };
@@ -253,7 +275,9 @@
   }
   function nextTurn(S) {
     if (S.phase !== 'play') return;
+    const prevCur = S.cur;
     do { S.cur = (S.cur + 1) % S.players.length; } while (cur(S).bk);
+    if (S.cur <= prevCur) S.round = (S.round || 1) + 1;
     S.turn = { phase: 'roll', doubles: 0, extra: false, dice: S.turn.dice, seq: S.turn.seq, pend: 0 };
     collectLoans(S, cur(S));
   }
@@ -337,6 +361,7 @@
   function tick(S) {
     if (S.phase !== 'play') return 0;
     let ret = 0;
+    if (S.case) { ret = 1; if (--S.case.left <= 0 || caseDone(S)) { resolveCase(S); ret = 2; } }
     if (S.auction) {
       ret = 1;
       if (--S.auction.left <= 0) { finishAuction(S); ret = 2; }
@@ -392,7 +417,7 @@
     }
     p.cash = 0; p.jc = []; p.bk = true;
     const alive = S.players.filter((x) => !x.bk);
-    if (alive.length === 1) { S.phase = 'over'; S.winner = alive[0].id; S.auction = null; S.aq = []; S.debts = []; log(S, '🏆 ' + alive[0].name + ' venceu o jogo!'); return; }
+    if (alive.length === 1) { S.phase = 'over'; S.winner = alive[0].id; S.auction = null; S.aq = []; S.debts = []; S.case = null; log(S, '🏆 ' + alive[0].name + ' venceu o jogo!'); return; }
     if (S.auction) { checkAuctionEnd(S); return; }
     if (S.aq.length) { startAuction(S, S.aq.shift()); return; }
     if (S.debts.length) { if (settle(S)) afterDebt(S); return; }
@@ -505,19 +530,87 @@
     for (let k = 0; k < t.give.jc; k++) b.jc.push(a.jc.pop());
     for (let k = 0; k < t.get.jc; k++) a.jc.push(b.jc.pop());
     log(S, 'Troca concluída entre ' + a.name + ' e ' + b.name + '.');
+    const snap = (x) => ({ cash: x.cash, props: x.props.slice(), jc: x.jc });
+    S.deals = S.deals || [];
+    S.deals.push({ id: ++S.did, a: a.id, b: b.id, give: snap(t.give), get: snap(t.get), round: S.round, rep: false });
+    if (S.deals.length > 12) S.deals.shift();
+  }
+
+  /* ------------------------------------------------------------------ JUIZ (denúncias de trocas suspeitas, decididas por votação) */
+  const VERDICTS = { fine: 'Multar', seize: 'Confiscar', return: 'Devolver', comp: 'Indemnizar quem denunciou', void: 'Denúncia inválida' };
+  const dealValue = (d) => d.give.cash + d.get.cash + [...d.give.props, ...d.get.props].reduce((s, i) => s + BOARD[i].p, 0);
+  const casePen = (d) => Math.min(400, Math.max(50, Math.round((dealValue(d) * 0.15) / 10) * 10));
+  const caseNeeded = (S) => S.case.voters.filter((id) => { const p = byId(S, id); return p && !p.bk && !p.auto; });
+  function transfer(S, from, to, amt) {
+    const pay = Math.max(0, Math.min(amt, from.cash));
+    from.cash -= pay;
+    if (to === 'bank') { if (S.settings.pot) S.pot += pay; } else to.cash += pay;
+    return pay;
+  }
+  function seizeProp(S, i) {
+    const st = S.props[i]; if (!st || st.owner === null) return;
+    if (st.houses === 5) S.hotels++; else S.houses += st.houses;
+    st.houses = 0; st.owner = null; st.mort = false;
+    S.seized = S.seized || []; if (!S.seized.includes(i)) S.seized.push(i);
+  }
+  function resolveCase(S) {
+    const c = S.case; if (!c) return;
+    const d = S.deals.find((x) => x.id === c.deal), rep = byId(S, c.by);
+    const tally = {}; Object.values(c.votes).forEach((v) => { tally[v] = (tally[v] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(tally)), win = Object.keys(tally).filter((k) => tally[k] === top);
+    S.case = null; S.verdict = { seq: ((S.verdict && S.verdict.seq) || 0) + 1, text: '' };
+    const say = (m) => { S.verdict.text = m; log(S, '⚖️ ' + m); };
+    if (!d || !top || win.length !== 1) { say('Denúncia arquivada (sem maioria): nada acontece.'); return; }
+    const v = win[0], pen = casePen(d), acc = c.accused.map((id) => byId(S, id)).filter(Boolean);
+    const A = byId(S, d.a), Bp = byId(S, d.b), names = acc.map((p) => p.name).join(' e ');
+    if (v === 'fine') {
+      acc.forEach((p) => transfer(S, p, 'bank', pen));
+      say('Veredicto: MULTA. ' + names + ' paga' + (acc.length > 1 ? 'm' : '') + ' até ' + money(pen) + ' cada ao banco.');
+    } else if (v === 'seize') {
+      const ps = [...d.give.props, ...d.get.props].filter((i) => S.props[i] && S.props[i].owner && [d.a, d.b].includes(S.props[i].owner));
+      if (!ps.length) { acc.forEach((p) => transfer(S, p, 'bank', pen * 2)); say('Veredicto: CONFISCO (sem propriedades na troca): ' + names + ' paga até ' + money(pen * 2) + ' ao banco.'); }
+      else { ps.forEach((i) => seizeProp(S, i)); say('Veredicto: CONFISCO. ' + ps.map((i) => BOARD[i].n).join(', ') + ' voltou ao banco (à venda).'); }
+    } else if (v === 'return') {
+      if (A && Bp) {
+        d.give.props.forEach((i) => { if (S.props[i].owner === Bp.id) S.props[i].owner = A.id; });
+        d.get.props.forEach((i) => { if (S.props[i].owner === A.id) S.props[i].owner = Bp.id; });
+        const j1 = Math.min(d.give.jc, Bp.jc.length), j2 = Math.min(d.get.jc, A.jc.length);
+        for (let k = 0; k < j1; k++) A.jc.push(Bp.jc.pop());
+        for (let k = 0; k < j2; k++) Bp.jc.push(A.jc.pop());
+        transfer(S, Bp, A, d.give.cash); transfer(S, A, Bp, d.get.cash);
+      }
+      say('Veredicto: DEVOLVER. A troca foi anulada e cada um recebeu de volta o que deu.');
+    } else if (v === 'comp') {
+      if (rep && !rep.bk) { acc.forEach((p) => transfer(S, p, rep, pen)); say('Veredicto: INDEMNIZAÇÃO. ' + names + ' paga' + (acc.length > 1 ? 'm' : '') + ' até ' + money(pen) + ' cada a ' + rep.name + '.'); }
+      else say('Veredicto: indemnização, mas quem denunciou já não está no jogo.');
+    } else {
+      const share = Math.floor(pen / Math.max(1, acc.length));
+      if (rep) acc.forEach((p) => transfer(S, rep, p, share));
+      say('Veredicto: DENÚNCIA INVÁLIDA. ' + (rep ? rep.name : 'Quem denunciou') + ' paga até ' + money(pen) + ' de indemnização a ' + names + '.');
+    }
+    d.verdict = v; trySettle(S);
+  }
+  function caseDone(S) {
+    const need = caseNeeded(S);
+    return need.length === 0 || need.every((id) => S.case.votes[id]);
   }
   const cleanSide = (s) => ({ cash: Math.max(0, Math.floor(+s.cash || 0)), props: (s.props || []).map(Number), jc: Math.max(0, Math.floor(+s.jc || 0)) });
 
   /* ------------------------------------------------------------------ ACÇÕES */
   function act(S, pid, a) {
     const me = byId(S, pid);
-    if (!me) return 'Jogador desconhecido.';
+    if (!me) {
+      const sp = (S.specs || []).find((x) => x.id === pid);
+      if (!sp) return 'Jogador desconhecido.';
+      if (a.type === 'chat') { const t = String(a.text || '').trim().slice(0, 200); if (t) { S.log.push({ n: sp.name, c: -1, t }); if (S.log.length > 120) S.log.shift(); } return null; }
+      return 'Estás a assistir: só podes conversar.';
+    }
     if (a.type === 'chat') { const t = String(a.text || '').trim().slice(0, 200); if (t) { S.log.push({ n: me.name, c: me.token, t }); if (S.log.length > 120) S.log.shift(); } return null; }
     if (S.phase === 'lobby') {
       if (a.type === 'token') { const t = a.token | 0; if (t < 0 || t > 11 || S.players.some((x) => x.token === t && x.id !== pid)) return 'Peça indisponível.'; me.token = t; return null; }
       if (a.type === 'rename') { me.name = String(a.name || '').trim().slice(0, 16) || me.name; return null; }
       if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
-      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
+      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; S.settings.limitHouses = a.limitHouses !== false; S.settings.lateJoin = a.lateJoin !== false; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
       if (a.type === 'start') return start(S);
       if (a.type === 'kick') { if (a.pid === pid) return 'Não te podes expulsar.'; S.players = S.players.filter((x) => x.id !== a.pid); return null; }
       return 'Acção inválida no lobby.';
@@ -673,6 +766,25 @@
         if (avail(S, me) < L.rem) return 'Precisas de ' + money(L.rem) + ' para quitar.';
         me.cash -= L.rem; creditLender(S, L, L.rem); dropLoan(S, L); log(S, '✅ ' + me.name + ' quitou um empréstimo antecipadamente.'); return null;
       }
+      case 'report': {
+        if (S.case) return 'Já há uma denúncia em julgamento.';
+        const d = (S.deals || []).find((x) => x.id === a.deal);
+        if (!d) return 'Negócio inexistente (só os últimos 12 podem ser denunciados).';
+        if (d.rep) return 'Este negócio já foi denunciado.';
+        const accused = [d.a, d.b].filter((id) => id !== pid);
+        let voters = S.players.filter((p) => !p.bk && p.id !== d.a && p.id !== d.b && p.id !== pid).map((p) => p.id);
+        if (!voters.length && pid !== d.a && pid !== d.b) voters = [pid];
+        if (!voters.length) return 'Não há jurados suficientes (precisa de pelo menos um jogador fora do negócio).';
+        d.rep = true;
+        S.case = { id: ++S.cid, deal: d.id, by: pid, accused, voters, votes: {}, reason: String(a.reason || '').trim().slice(0, 120), left: 60 };
+        log(S, '⚖️ ' + me.name + ' denunciou uma troca entre ' + byId(S, d.a).name + ' e ' + byId(S, d.b).name + '. Os jurados têm 60 s para votar.'); return null;
+      }
+      case 'vote': {
+        const c = S.case; if (!c) return 'Não há nenhuma denúncia em julgamento.';
+        if (!c.voters.includes(pid)) return 'Não és jurado neste caso.';
+        if (!VERDICTS[a.v]) return 'Voto inválido.';
+        c.votes[pid] = a.v; if (caseDone(S)) resolveCase(S); return null;
+      }
       case 'kick': {
         if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
         const v = byId(S, a.pid); if (!v || v.bk) return 'Jogador inválido.';
@@ -682,6 +794,6 @@
     return 'Acção desconhecida.';
   }
 
-  Object.assign(E, { BOARD, GROUPS, GC, RAILS, UTILS, TOKENS, PCOL, CARDS, newGame, join, start, act, tick, byId, cur, calcRent, canBuild, canSell, bankRate, loanTotal, LOAN_GRACE, mortVal, unmortCost, validTrade, ownsGroup, groupBuilt, money });
+  Object.assign(E, { VERDICTS, casePen, dealValue, BOARD, GROUPS, GC, RAILS, UTILS, TOKENS, PCOL, CARDS, newGame, join, start, act, tick, byId, cur, calcRent, canBuild, canSell, bankRate, loanTotal, LOAN_GRACE, mortVal, unmortCost, validTrade, ownsGroup, groupBuilt, money });
   if (typeof module !== 'undefined' && module.exports) module.exports = E; else root.Engine = E;
 })(typeof window !== 'undefined' ? window : this);

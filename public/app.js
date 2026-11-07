@@ -31,12 +31,16 @@ function connect() {
   const wd = setTimeout(() => { if (w.readyState !== 1) { try { w.close(); } catch (e) {} } }, 8000);
   w.onopen = () => {
     clearTimeout(wd); attempts = 0; setNet('');
+    Voice.selfId = pid; Voice.send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
     w.send(JSON.stringify(wantCreate && !S ? { t: 'create', pid, name: myName } : { t: 'join', code: roomCode, pid, name: myName }));
+    Voice.resume();
   };
   w.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 's') { S = m.s; roomCode = S.code; wantCreate = false; sess(); render(); }
-    else if (m.t === 'clk' && S) { S.tl = m.tl; if (S.auction) S.auction.left = m.left; updClock(); }
+    else if (m.t === 'voice') Voice.setList(m.list);
+    else if (m.t === 'vsig') Voice.signal(m.from, m.d);
+    else if (m.t === 'clk' && S) { S.tl = m.tl; if (S.auction) S.auction.left = m.left; if (S.case) S.case.left = m.cl; updClock(); }
     else if (m.t === 'err') { toast(m.m, 4500); if (m.fatal) leaveRoom(); }
   };
   w.onclose = () => { clearTimeout(wd); if (w === ws) retry(); };
@@ -55,13 +59,13 @@ function dispatch(a) {
   else toast('Sem ligação ao servidor.');
 }
 function leaveRoom() {
-  leaving = true; clearTimeout(retryT);
+  leaving = true; clearTimeout(retryT); Voice.leave(); Voice.list = [];
   try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) {}
   ws = null; S = null; roomCode = '';
   ssSet('imobl_sess', ''); lsSet('imobl_last', ''); setNet(''); goHome();
 }
 function goHome() {
-  S = null; ui.lastSig = ''; ui.shown = {}; ui.diceSeq = -1; ui.cardSeq = 0; ui.dealsN = 0; ui.overShown = false;
+  S = null; ui.lastSig = ''; ui.shown = {}; ui.diceSeq = -1; ui.cardSeq = 0; ui.dealsN = 0; ui.overShown = false; ui.snd = null;
   $('#game').innerHTML = '';
   ['lobby', 'game', 'modal', 'cardpop'].forEach((i) => $('#' + i).classList.add('hidden'));
   $('#home').classList.remove('hidden');
@@ -73,6 +77,39 @@ function goHome() {
 const pcol = (p) => E.PCOL[p.token];
 const tokenOf = (p) => E.TOKENS[p.token];
 const me = () => S && E.byId(S, pid);
+const isSpec = () => !!S && !E.byId(S, pid);
+const anyName = (id) => { const p = E.byId(S, id) || (S.specs || []).find((x) => x.id === id); return p ? p.name : null; };
+Voice.onChange = () => { ui.lastSig = ''; if (S) render(); };
+
+/* ---------- som e voz ---------- */
+function mediaBarHtml() {
+  const V = Voice, names = V.list.map(anyName).filter(Boolean);
+  return `<div class="mediabar"><button class="ghost sm" data-act="sfx" title="Ligar/desligar sons">${SFX.isMuted() ? '🔇 Sons' : '🔊 Sons'}</button>`
+    + (V.joined ? `<button class="${V.muted ? 'ghost' : 'good'} sm" data-act="vmute">${V.muted ? '🔇 Microfone desligado' : '🎙️ Microfone ligado'}</button><button class="ghost sm" data-act="vleave">📞 Sair da voz</button>`
+      : '<button class="alt sm" data-act="vjoin">🎙️ Entrar na chamada de voz</button>') + '</div>'
+    + (names.length ? `<p class="hint vnames">🎧 Na chamada: ${names.map(esc).join(', ')}</p>` : '')
+    + (V.error ? `<p class="hint" style="color:#ff7b80">${esc(V.error)}</p>` : '');
+}
+/* efeitos sonoros: esperam que os dados/peças assentem antes de tocar */
+const sfxLater = (fn) => { const d = ui.hold - Date.now(); if (d > 0) setTimeout(fn, d); else fn(); };
+function soundEvents() {
+  const m = me(), c = E.cur(S);
+  const myProps = m ? Object.keys(S.props).filter((i) => S.props[i].owner === pid).length : 0;
+  const jailed = S.players.filter((p) => p.jail && !p.bk).map((p) => p.id).join();
+  if (ui.snd) {
+    if (S.auction && !ui.snd.auction) SFX.bell();
+    if (m && myProps > ui.snd.props) sfxLater(SFX.buy);
+    else if (m && m.cash > ui.snd.cash) sfxLater(SFX.gain);
+    else if (m && m.cash < ui.snd.cash) sfxLater(SFX.pay);
+    if (jailed.length > ui.snd.jailed.length && jailed !== ui.snd.jailed) sfxLater(SFX.jail);
+    if (S.case && (!ui.snd.caseId || ui.snd.caseId !== S.case.id)) { SFX.alert(); if (S.case.voters.includes(pid)) toast('⚖️ Nova denúncia! Vota no painel de acções.', 5000); }
+    if (S.verdict && S.verdict.seq > ui.snd.verdict) { SFX.gavel(); toast('⚖️ ' + S.verdict.text, 8000); }
+    if (S.phase === 'play' && c.id === pid && !ui.snd.mine) SFX.turn();
+    if (S.phase === 'over' && !ui.snd.over) SFX.win();
+    if (S.players.length > ui.snd.n) SFX.join();
+  }
+  ui.snd = { auction: !!S.auction, props: myProps, cash: m ? m.cash : 0, jailed, caseId: S.case ? S.case.id : 0, verdict: S.verdict ? S.verdict.seq : 0, mine: S.phase === 'play' && c.id === pid, over: S.phase === 'over', n: S.players.length };
+}
 const sqPos = (i) => (i <= 10 ? { r: 11, c: 11 - i } : i <= 20 ? { r: 21 - i, c: 1 } : i <= 30 ? { r: 1, c: i - 19 } : { r: i - 29, c: 11 });
 const sideOf = (i) => (i > 0 && i < 10 ? 'b' : i > 10 && i < 20 ? 'l' : i > 20 && i < 30 ? 't' : i > 30 ? 'r' : 'c');
 const icon = (s) => ({ go: '➡️', chance: '❓', cc: '📦', tax: '💰', rail: '🚂', util: s.n.startsWith('ENDE') ? '💡' : '🚰', jail: '🔒', park: '🅿️', gojail: '👮' }[s.t] || '');
@@ -101,6 +138,7 @@ function render() {
 
 function updClock() {
   const el = $('#aucLeft'); if (el && S.auction) el.textContent = S.auction.left + 's';
+  const cl = $('#caseLeft'); if (cl && S.case) cl.textContent = S.case.left + 's';
   const t = $('#tlv'); if (!t) return;
   const on = S.phase === 'play' && S.settings.turnTime && S.turn.phase !== 'auction' && S.tl > 0;
   t.classList.toggle('hidden', !on);
@@ -121,8 +159,11 @@ function renderLobby() {
     <div class="row"><input readonly value="${esc(link)}" id="lnk" onclick="this.select()"><button class="alt" data-act="copy">Copiar link</button></div></div>
   <div class="card"><h2>Jogadores (${S.players.length}/12)</h2><div class="plist">${pl}</div></div>
   <div class="card"><h2>A tua peça</h2><div class="tokens">${tk}</div></div>
+  <div class="card"><h2>Som e voz</h2>${mediaBarHtml()}<p class="hint">A chamada de voz é entre todos os que estão na sala, incluindo quem estiver só a assistir.</p></div>
   ${isHost ? `<div class="card"><h2>Regras da casa</h2>
     <div class="row"><label>Dinheiro inicial <input type="number" id="setCash" value="${S.settings.cash}" min="500" max="10000" step="100" style="width:110px"></label>
+    <label>O banco limita as casas e hotéis? <select id="setLimit"><option value="1" ${S.settings.limitHouses !== false ? 'selected' : ''}>Sim: 32 casas e 12 hotéis (mais com +8 jogadores)</option><option value="0" ${S.settings.limitHouses === false ? 'selected' : ''}>Não: casas e hotéis ilimitados</option></select></label>
+    <label><input type="checkbox" id="setLate" ${S.settings.lateJoin !== false ? 'checked' : ''}> Permitir entrar a meio da partida (só nas 2 primeiras rondas; depois assistem)</label>
     <label><input type="checkbox" id="setPot" ${S.settings.pot ? 'checked' : ''}> Multas e impostos acumulam no Parque Gratuito</label>
     <label>Tempo por jogada <select id="setTime">${[[0, 'Sem limite'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']].map(([v, l]) => `<option value="${v}" ${S.settings.turnTime === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
     <p class="hint">Se alguém demorar mais que o tempo, o jogo joga a vez por essa pessoa; depois de 2 vezes seguidas passa a modo automático até voltar a clicar.</p>
@@ -204,7 +245,7 @@ function syncTokens() {
       if (Date.now() < ui.hold) return;
       const target = E.byId(S, p.id) ? E.byId(S, p.id).pos : ui.shown[p.id];
       if (ui.shown[p.id] === target) { clearInterval(ui.hop[p.id]); delete ui.hop[p.id]; return; }
-      ui.shown[p.id] = (ui.shown[p.id] + 1) % 40; placeTokens();
+      ui.shown[p.id] = (ui.shown[p.id] + 1) % 40; placeTokens(); SFX.step();
     }, 150);
   });
   placeTokens();
@@ -228,7 +269,31 @@ function deedHtml(i) {
 }
 
 /* ---------- painéis ---------- */
+/* ---------- juiz: denúncia em julgamento ---------- */
+const VDESC = { fine: 'Cada acusado paga a multa ao banco', seize: 'As propriedades da troca voltam ao banco', return: 'A troca é anulada e cada um recebe o que deu', comp: 'Os acusados indemnizam quem denunciou', void: 'Quem denunciou indemniza os acusados' };
+function caseHtml() {
+  const c = S.case; if (!c) return '';
+  const d = S.deals.find((x) => x.id === c.deal); if (!d) return '';
+  const pen = E.casePen(d), voted = c.voters.filter((id) => c.votes[id]).length, juror = c.voters.includes(pid);
+  let h = `<div class="box2 case"><b>⚖️ Denúncia em julgamento</b> <span class="cl" id="caseLeft">${c.left}s</span><br>
+    <b>${esc(nameOf(c.by))}</b> denunciou a troca entre <b>${esc(nameOf(d.a))}</b> e <b>${esc(nameOf(d.b))}</b>:<br>
+    ${esc(nameOf(d.a))} deu: ${esc(sideDesc(d.give))} · ${esc(nameOf(d.b))} deu: ${esc(sideDesc(d.get))}
+    ${c.reason ? `<br><i>“${esc(c.reason)}”</i>` : ''}<br><small>Jurados (${voted}/${c.voters.length} votaram): ${c.voters.map((id) => esc(nameOf(id)) + (c.votes[id] ? ' ✔' : '')).join(', ')} · valor da multa/indemnização: até ${kz(pen)}</small>`;
+  if (juror) {
+    h += `<p style="margin:8px 0 4px"><b>${c.votes[pid] ? 'O teu voto: ' + esc(E.VERDICTS[c.votes[pid]]) + ' (podes mudar)' : 'Vota no veredicto:'}</b></p><div class="verd">`
+      + Object.keys(E.VERDICTS).map((k) => `<button class="${c.votes[pid] === k ? 'good' : 'alt'} sm" data-act="vote" data-v="${k}" title="${esc(VDESC[k])}">${esc(E.VERDICTS[k])}<small>${esc(VDESC[k])}</small></button>`).join('') + '</div>';
+  } else h += '<p class="hint" style="margin:6px 0 0">Os jogadores que não estão envolvidos decidem por maioria; em caso de empate a denúncia é arquivada.</p>';
+  return h + '</div>';
+}
+function spectatorHtml() {
+  const c = E.cur(S);
+  return mediaBarHtml() + caseHtml() + `<div class="box2">👀 <b>Estás a assistir</b> à partida. Vez de <b>${esc(c.name)}</b> · Ronda ${S.round}.<br>Podes conversar no separador Registo e falar na chamada de voz.</div>`;
+}
 function actionsHtml() {
+  if (isSpec()) return spectatorHtml();
+  return mediaBarHtml() + caseHtml() + actionsInner();
+}
+function actionsInner() {
   const T = S.turn, c = E.cur(S), m = me(), mine = c.id === pid;
   if (S.phase === 'over') {
     const w = E.byId(S, S.winner);
@@ -276,12 +341,12 @@ function playersHtml() {
       <div class="info"><b>${esc(p.name)}${p.id === pid ? ' (tu)' : ''}${p.id === S.hostPid ? ' 👑' : ''}<span class="bdg">${p.jail ? '🔒' : ''}${p.jc.length ? '🎫'.repeat(p.jc.length) : ''}${nl ? '💳' + nl : ''}${p.auto && !p.bk ? '🤖' : ''}${!p.connected && !p.bk ? '📴' : ''}</span></b>
         <span class="cash ${p.cash < 0 ? 'neg' : ''}">${p.bk ? 'Falido' : kz(p.cash)}</span><div class="chips">${chips}</div></div>
       ${isHost && p.id !== pid && !p.bk ? `<button class="sm ghost" data-act="kick" data-pid="${p.id}" data-confirm="Remover ${esc(p.name)} do jogo?">✖</button>` : ''}</div>`;
-  }).join('');
+  }).join('') + ((S.specs || []).length ? `<p class="hint">👀 A assistir: ${S.specs.map((x) => esc(x.name)).join(', ')}</p>` : '');
 }
 function seizedHtml() {
   const list = (S.seized || []).filter((i) => S.props[i] && S.props[i].owner === null);
   if (!list.length) return '';
-  const m = me(), c = E.cur(S);
+  const m = me() || { bk: true, cash: 0 }, c = E.cur(S);
   const canAuc = !m.bk && c.id === pid && !S.auction && !S.debts.length && (S.turn.phase === 'roll' || S.turn.phase === 'end');
   const canBuy = !m.bk && !S.auction && !S.debts.length;
   return `<div class="seized"><h3>🏚️ Confiscadas (à venda no banco)</h3>` + list.map((i) => `<div class="prow"><span class="pc" style="background:${propColor(i)}"></span>
@@ -290,7 +355,8 @@ function seizedHtml() {
     <button class="sm alt" data-act="auctionSeized" data-sq="${i}" ${canAuc ? '' : 'disabled'} title="Só na tua vez">Leilão</button></div>`).join('') + '</div>';
 }
 function bankHtml() {
-  return seizedHtml() + `<div class="bankinfo"><span>🏠 Casas <b>${S.houses}</b></span><span>🏨 Hotéis <b>${S.hotels}</b></span>${S.settings.pot ? `<span>🅿️ <b>${kz(S.pot)}</b></span>` : ''}</div>`;
+  const lim = S.settings.limitHouses !== false;
+  return seizedHtml() + `<div class="bankinfo"><span>🔄 Ronda <b>${S.round}</b></span><span>🏠 Casas <b>${lim ? S.houses : '∞'}</b></span><span>🏨 Hotéis <b>${lim ? S.hotels : '∞'}</b></span>${S.settings.pot ? `<span>🅿️ <b>${kz(S.pot)}</b></span>` : ''}</div>`;
 }
 function myPropsHtml() {
   const m = me();
@@ -320,9 +386,17 @@ function loansHtml() {
     <h3 style="margin:10px 0 6px">O que emprestei</h3>${lent.length ? lent.map((l) => card(l, false)).join('') : '<p class="hint">Nada emprestado.</p>'}
     <p class="hint">A prestação é paga no início da tua vez. Se falhares ${E.LOAN_GRACE} vezes seguidas aplica-se a penalização combinada: confisco da propriedade mais barata ou saldo negativo.</p>`;
 }
+function historyHtml() {
+  const list = [...(S.deals || [])].reverse(), canRep = !isSpec() && !me().bk && !S.case;
+  if (!list.length) return '';
+  return '<h3 style="margin:12px 0 6px">📜 Trocas concluídas</h3>' + list.map((d) => `<div class="box2"><b>${esc(nameOf(d.a))}</b> deu: ${esc(sideDesc(d.give))}<br><b>${esc(nameOf(d.b))}</b> deu: ${esc(sideDesc(d.get))}
+    <div class="acts"><small class="hint" style="margin:0;flex:1">Ronda ${d.round}${d.verdict ? ' · ⚖️ ' + esc(E.VERDICTS[d.verdict]) : d.rep ? ' · ⚖️ em julgamento' : ''}</small>
+    ${!d.rep && !isSpec() ? `<button class="ghost sm" data-act="report" data-id="${d.id}" ${canRep ? '' : 'disabled'} title="Denunciar esta troca como suspeita; os outros jogadores votam o veredicto">🚩 Denunciar</button>` : ''}</div></div>`).join('')
+    + '<p class="hint">Se achares uma troca suspeita (conluio, preço absurdo), denuncia: os jogadores fora do negócio votam multar, confiscar, devolver, indemnizar ou invalidar a denúncia.</p>';
+}
 function dealsHtml() {
   const mineT = S.trades.filter((t) => t.from === pid || t.to === pid), mineL = S.lreq.filter((r) => r.from === pid || r.to === pid);
-  if (!mineT.length && !mineL.length) return '<p class="hint">Sem propostas pendentes. Usa os botões 🤝 Troca e 💸 Pedir a jogador.</p>';
+  if (!mineT.length && !mineL.length) return (isSpec() ? ((S.deals || []).length ? '' : '<p class="hint">Ainda não houve trocas nesta partida.</p>') : '<p class="hint">Sem propostas pendentes. Usa os botões 🤝 Troca e 💸 Pedir a jogador.</p>') + historyHtml();
   const trades = mineT.map((t) => {
     const a = E.byId(S, t.from), b = E.byId(S, t.to), inc = t.to === pid;
     return `<div class="box2"><b>🤝 ${esc(a.name)}</b> dá: ${esc(sideDesc(t.give))}<br><b>${esc(b.name)}</b> dá: ${esc(sideDesc(t.get))}
@@ -333,20 +407,21 @@ function dealsHtml() {
     return `<div class="box2"><b>💸 ${esc(a.name)}</b> pede <b>${kz(r.amount)}</b> a ${esc(E.byId(S, r.to).name)}<br>Juros ${r.rate}% (total ${kz(tot)}) · ${r.n} rondas (~${kz(Math.ceil(tot / r.n))}/ronda)<br>Penalização: ${penTxt(r.pen)}
       <div class="acts">${inc ? `<button class="good sm" data-act="loanYes" data-id="${r.id}">Emprestar</button><button class="ghost sm" data-act="loanNo" data-id="${r.id}">Recusar</button>` : `<button class="ghost sm" data-act="loanNo" data-id="${r.id}">Cancelar</button>`}</div></div>`;
   }).join('');
-  return trades + loans;
+  return trades + loans + historyHtml();
 }
-const logHtml = () => S.log.slice(-80).map((l) => (typeof l === 'string' ? `<div>${esc(l)}</div>` : `<div class="ch">${E.TOKENS[l.c] || ''} <b>${esc(l.n)}:</b> ${esc(l.t)}</div>`)).join('');
+const logHtml = () => S.log.slice(-80).map((l) => (typeof l === 'string' ? `<div>${esc(l)}</div>` : `<div class="ch">${l.c < 0 ? '👀' : (E.TOKENS[l.c] || '')} <b>${esc(l.n)}:</b> ${esc(l.t)}</div>`)).join('');
 const incomingDeals = () => S.trades.filter((t) => t.to === pid).length + S.lreq.filter((r) => r.to === pid).length;
 
 function tabsHtml() {
-  const n = incomingDeals(), tabs = [['props', '🏠', 'Imóveis'], ['loans', '💳', 'Dívidas'], ['deals', '🤝', 'Propostas'], ['log', '💬', 'Registo'], ['players', '👥', 'Jogadores']];
+  const n = incomingDeals(), all = [['props', '🏠', 'Imóveis'], ['loans', '💳', 'Dívidas'], ['deals', '🤝', 'Propostas'], ['log', '💬', 'Registo'], ['players', '👥', 'Jogadores']];
+  const tabs = isSpec() ? all.filter((t) => t[0] !== 'props' && t[0] !== 'loans') : all;
   return tabs.map(([k, i, l]) => `<button class="${ui.tab === k ? 'on' : ''} ${k === 'players' ? 'pltab' : ''}" data-tab="${k}" aria-label="${l}"><span class="ti">${i}</span><span class="tl">${l}</span>${k === 'deals' && n ? `<span class="b">${n}</span>` : ''}</button>`).join('');
 }
 const isMobile = () => window.matchMedia('(max-aspect-ratio:1/1),(max-width:560px)').matches;
 function mbarHtml() {
-  const m = me();
+  const m = me() || { cash: 0, bk: false, spec: true };
   return `<div class="mb-l"><span class="mb-logo">🏠</span><div class="mb-t"><b>Imobiliário Luanda</b><small>Sala ${esc(S.code)}</small></div></div>
-    <div class="mb-r"><div class="mb-cash ${m.cash < 0 ? 'neg' : ''}"><small>Saldo</small><b>${m.bk ? 'Falido' : kz(m.cash)}</b></div><button class="ghost ibtn" data-open="rules" aria-label="Regras">📖</button></div>`;
+    <div class="mb-r"><div class="mb-cash ${m.cash < 0 ? 'neg' : ''}"><small>${m.spec ? 'Modo' : 'Saldo'}</small><b>${m.spec ? '👀 Assistir' : m.bk ? 'Falido' : kz(m.cash)}</b></div><button class="ghost ibtn" data-open="rules" aria-label="Regras">📖</button></div>`;
 }
 function pstripHtml() {
   const c = E.cur(S);
@@ -354,6 +429,7 @@ function pstripHtml() {
     <span class="av" style="background:${pcol(p)}">${tokenOf(p)}</span><span class="pi"><b>${esc(p.name)}${p.jail ? ' 🔒' : ''}${p.auto && !p.bk ? ' 🤖' : ''}${!p.connected && !p.bk ? ' 📴' : ''}</b><em class="${p.cash < 0 ? 'neg' : ''}">${p.bk ? 'Falido' : kz(p.cash)}</em></span></button>`).join('');
 }
 function tabContent() {
+  if (isSpec() && (ui.tab === 'props' || ui.tab === 'loans')) ui.tab = 'players';
   switch (ui.tab) {
     case 'loans': return loansHtml();
     case 'deals': return dealsHtml();
@@ -385,6 +461,7 @@ function ensureSkeleton() {
 function lastEvent() { for (let i = S.log.length - 1; i >= 0; i--) if (typeof S.log[i] === 'string') return S.log[i]; return ''; }
 function renderGame() {
   ensureSkeleton();
+  if (isSpec() && (ui.tab === 'props' || ui.tab === 'loans')) ui.tab = 'players';
   const c = E.cur(S);
   $('#sqs').innerHTML = squaresHtml();
   $('#pill').innerHTML = S.phase === 'over' ? '🏆 Fim de jogo' : `<span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span>${c.id === pid ? 'A tua vez' : 'Vez de ' + esc(c.name)}${c.auto ? ' 🤖' : ''}<span class="tlv hidden" id="tlv"></span>`;
@@ -409,7 +486,7 @@ function renderGame() {
   $('#chatrow').classList.toggle('hidden', ui.tab !== 'log');
   // dados
   if (S.turn.seq !== ui.diceSeq) {
-    if (ui.diceSeq !== -1 && S.turn.seq > ui.diceSeq) { setDice(S.turn.dice, true); ui.hold = Date.now() + 1250; }
+    if (ui.diceSeq !== -1 && S.turn.seq > ui.diceSeq) { setDice(S.turn.dice, true); ui.hold = Date.now() + 1250; SFX.dice(); }
     else setDice(S.turn.dice, false);
     ui.diceSeq = S.turn.seq;
   }
@@ -420,11 +497,13 @@ function renderGame() {
   ui.dealsN = dn;
   // carta
   if (S.card && S.card.seq > ui.cardSeq) { if (ui.cardSeq !== 0 || S.card.seq === 1) showCard(); ui.cardSeq = S.card.seq; }
+  soundEvents();
   if (S.phase === 'over' && !ui.overShown) { ui.overShown = true; const w = E.byId(S, S.winner); openModal(`<div class="win"><div class="big">🏆</div><h2>${esc(w.name)} ${tokenOf(w)}</h2><p>é o grande vencedor do Imobiliário Luanda!</p></div>`); }
 }
 function showCard() {
   const c = S.card, p = E.byId(S, c.pid), el = $('#cardpop');
   el.className = c.deck; el.innerHTML = `<h3>${c.deck === 'chance' ? '❓ Sorte' : '📦 Caixa Comunitária'}</h3>${esc(c.text)}<p style="font-size:12px;opacity:.7;margin:8px 0 0">${esc(p ? p.name : '')}</p>`;
+  sfxLater(SFX.card);
   clearTimeout(showCard.t); showCard.t = setTimeout(() => el.classList.add('hidden'), ui.hold > Date.now() ? 6200 : 5000);
   if (ui.hold > Date.now()) { el.classList.add('hidden'); setTimeout(() => el.classList.remove('hidden'), Math.max(0, ui.hold - Date.now())); }
 }
@@ -437,12 +516,15 @@ function rulesHtml() {
   <p><b>Objectivo:</b> ficar como o único jogador com dinheiro. Cada jogador começa com 1500 Kz.</p>
   <p><b>Vez:</b> lança os dados e avança. Passar pela <b>Partida</b> dá 200 Kz. <b>Duplo</b> = jogas outra vez; <b>3 duplos</b> seguidos = Cadeia.</p>
   <p><b>Comprar:</b> propriedade sem dono pode ser comprada; se recusares vai a <b>leilão</b>. Com dono, pagas renda.</p>
-  <p><b>Cores:</b> todas as ruas de uma cor = renda a dobrar e podes construir (uniformemente; 4 casas e depois hotel). O banco tem 32 casas e 12 hotéis (com mais de 8 jogadores, ganha 4 casas e 1,5 hotéis por jogador extra: 12 jogadores = 48 casas e 18 hotéis).</p>
+  <p><b>Cores:</b> todas as ruas de uma cor = renda a dobrar e podes construir (uniformemente; 4 casas e depois hotel). Se o anfitrião activar o limite, o banco tem 32 casas e 12 hotéis (com mais de 8 jogadores, ganha 4 casas e 1,5 hotéis por jogador extra); caso contrário são ilimitados.</p>
   <p><b>Linhas e serviços:</b> linhas 25/50/100/200 Kz; serviços 4× (ou 10× com os dois) os dados.</p>
   <p><b>Cadeia:</b> sais com duplo, 50 Kz ou carta. À 3.ª tentativa falhada pagas 50 Kz e avanças.</p>
   <p><b>Hipotecas:</b> recebes metade do preço; resgatar custa +10%. Sem renda enquanto hipotecada.</p>
   <p><b>Trocas:</b> propriedades, dinheiro e cartas a qualquer momento (sem construções no grupo).</p>
   <p><b>💳 Empréstimos:</b> o banco empresta 50–1000 Kz (juros 5% + 2% por ronda de prazo). Também podes pedir a outro jogador com juros acordados. A prestação paga-se no início da tua vez; se falhares ${E.LOAN_GRACE} vezes seguidas aplica-se a penalização escolhida: <b>confisco da propriedade mais barata</b> ou <b>saldo negativo</b>.</p>
+  <p><b>⚖️ Juiz (votação):</b> viste uma troca suspeita? No separador Propostas, em “Trocas concluídas”, carrega em 🚩 Denunciar. Os jogadores fora do negócio votam durante 60 s: <b>multar</b> (os acusados pagam ao banco), <b>confiscar</b> (as propriedades voltam ao banco), <b>devolver</b> (anula a troca), <b>indemnizar</b> quem denunciou, ou <b>denúncia inválida</b> (quem denunciou indemniza os acusados). A maioria decide; em caso de empate a denúncia é arquivada.</p>
+  <p><b>👀 Entrar a meio:</b> quem entra com o código numa partida a decorrer pode jogar se ainda estivermos nas <b>2 primeiras rondas</b> (começa com o dinheiro inicial); depois fica a <b>assistir</b>, pode conversar e falar na chamada de voz.</p>
+  <p><b>🎙️ Voz e sons:</b> a chamada de voz é entre todos os que estão na sala (incluindo quem assiste). Há sons para os dados, passos, dinheiro, cartas, leilões e veredictos; podes desligá-los.</p>
   <p><b>🏚️ Propriedades confiscadas:</b> as confiscadas pelo banco ficam à venda: qualquer jogador pode comprá-las ao preço de tabela, ou o jogador da vez pode pô-las a <b>leilão</b>.</p>
   <p><b>Falência:</b> se não pagas uma dívida: ao jogador a quem deves vai tudo; ao banco, as propriedades vão a leilão.</p></div>`;
 }
@@ -506,8 +588,8 @@ document.addEventListener('click', (ev) => {
   }
   if (t.dataset.open === 'rules') { openModal(rulesHtml()); return; }
   if (t.dataset.open === 'trade') { ui.trade = { to: null, give: { cash: 0, props: [], jc: 0 }, get: { cash: 0, props: [], jc: 0 } }; openModal(''); refreshTrade(); return; }
-  if (t.dataset.open === 'loanBank') { if (me().bk) return; openModal(loanBankModal()); updLoanSum('bank'); return; }
-  if (t.dataset.open === 'loanAsk') { if (me().bk) return; if (!S.players.some((p) => !p.bk && p.id !== pid)) return; openModal(loanAskModal()); updLoanSum('ask'); return; }
+  if (t.dataset.open === 'loanBank') { if (isSpec() || me().bk) return; openModal(loanBankModal()); updLoanSum('bank'); return; }
+  if (t.dataset.open === 'loanAsk') { if (isSpec() || me().bk) return; if (!S.players.some((p) => !p.bk && p.id !== pid)) return; openModal(loanAskModal()); updLoanSum('ask'); return; }
   if (t.dataset.tradeTo) { ui.trade.to = t.dataset.tradeTo; ui.trade.give = { cash: 0, props: [], jc: 0 }; ui.trade.get = { cash: 0, props: [], jc: 0 }; refreshTrade(); return; }
   if (!t.dataset.act) { if (t.dataset.sq != null && S) { ev.preventDefault(); openModal(deedHtml(+t.dataset.sq)); } return; }
   ev.preventDefault();
@@ -518,7 +600,13 @@ document.addEventListener('click', (ev) => {
     case 'leave': if (!local && S.phase === 'play' && !confirm('Sair desta sala? Podes voltar a entrar com o mesmo código.')) break; leaveRoom(); break;
     case 'token': dispatch({ type: 'token', token: +t.dataset.token }); break;
     case 'kick': dispatch({ type: 'kick', pid: t.dataset.pid }); break;
-    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value }); dispatch({ type: 'start' }); break;
+    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value, limitHouses: $('#setLimit').value === '1', lateJoin: $('#setLate').checked }); dispatch({ type: 'start' }); break;
+    case 'sfx': SFX.setMuted(!SFX.isMuted()); ui.lastSig = ''; render(); break;
+    case 'vjoin': Voice.join(); break;
+    case 'vleave': Voice.leave(); break;
+    case 'vmute': Voice.toggleMute(); break;
+    case 'report': { const why = prompt('Motivo da denúncia (opcional):', ''); if (why === null) break; dispatch({ type: 'report', deal: +t.dataset.id, reason: why }); break; }
+    case 'vote': dispatch({ type: 'vote', v: t.dataset.v }); break;
     case 'bidrel': dispatch({ type: 'bid', amount: S.auction.bid + (+t.dataset.add) }); break;
     case 'bidcustom': dispatch({ type: 'bid', amount: +$('#bidAmt').value }); break;
     case 'chat': { const i = $('#chatIn'); if (i.value.trim()) { dispatch({ type: 'chat', text: i.value }); i.value = ''; } break; }

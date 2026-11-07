@@ -26,6 +26,10 @@ npm test         # simula centenas de jogos + testa as salas
 **empréstimos** (banco 5%+2%/ronda ou entre jogadores, prestação por ronda, confisco de propriedade ou saldo negativo), compra e **leilão** com relógio, rendas (cor completa a dobrar), casas e hotéis (construção uniforme, 32/12; com mais de 8 jogadores o banco tem mais: 4 casas e 1,5 hotéis por jogador), hipotecas,
 cartas de Sorte e Caixa Comunitária (16+16), **trocas**, dívidas, falência, vencedor, chat e reconexão.
 **Propriedades confiscadas** por dívidas ao banco ficam à venda: qualquer jogador pode comprá-las ao preço de tabela ou o jogador da vez pode pô-las a leilão.
+**Espectadores e entrada a meio:** quem entra numa partida a decorrer joga se ainda estivermos nas 2 primeiras rondas (com o dinheiro inicial); depois assiste, conversa e fala na chamada de voz.
+**Limite de casas:** o anfitrião escolhe no lobby se o banco limita casas e hotéis (32/12, escalável) ou se são ilimitados.
+**Juiz por votação:** qualquer jogador pode denunciar uma das últimas trocas; os jogadores fora do negócio votam (60 s) multar, confiscar, devolver, indemnizar o denunciante ou invalidar a denúncia (o denunciante indemniza). Maioria decide; empate arquiva.
+**Sons e voz:** efeitos sonoros sintetizados (dados, passos, dinheiro, cartas, leilão, veredicto) e chamada de voz WebRTC em malha entre todos os da sala (o servidor só faz a sinalização; precisa de HTTPS e, em redes restritivas, pode precisar de um servidor TURN).
 Regra opcional: multas e impostos acumulam no Parque Gratuito.
 
 *Jogo de fãs, sem ligação à Hasbro. "Monopoly" é marca registada dos seus titulares.*

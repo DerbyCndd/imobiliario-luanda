@@ -15,7 +15,13 @@ const other=curPid()==='pa'?B:A;tx(other,{t:'act',a:{type:'roll'}});ok(other.err
 // desconexão e reconexão
 B.close();ok(S().players.find(p=>p.id==='pb').connected===false,'desligado marcado');
 const B2=mk();tx(B2,{t:'join',code,pid:'pb',name:'Bruno'});ok(S().players.find(p=>p.id==='pb').connected===true&&B2.last().s.phase==='play','reconexão repõe o estado');
-const C=mk();tx(C,{t:'join',code,pid:'pc',name:'Carlos'});ok(C.errs()[0]&&/começou/.test(C.errs()[0].m),'novo jogador após início rejeitado');
+R.rooms.get(code).S.round=3;
+const C=mk();tx(C,{t:'join',code,pid:'pc',name:'Carlos'});ok(!C.errs().length&&S().specs.length===1&&S().players.length===2,'depois da ronda 2 quem entra fica a assistir');
+tx(C,{t:'act',a:{type:'roll'}});ok(C.errs().length===1,'espectador não joga');
+tx(C,{t:'act',a:{type:'chat',text:'olá'}});ok(typeof S().log[S().log.length-1]==='object','espectador pode conversar');
+R.rooms.get(code).S.round=1;
+const D=mk();tx(D,{t:'join',code,pid:'pd',name:'Dina'});ok(S().players.length===3&&S().players[2].id==='pd'&&S().players[2].cash===1500,'na ronda 1 entra a meio como jogador');
+R.rooms.get(code).S.players.pop();
 // leilão + relógio
 for(let i=0;i<60&&S().turn.phase!=='buy'&&S().phase==='play';i++){const w=W();const ph=S().turn.phase;if(ph==='roll')tx(w,{t:'act',a:{type:'roll'}});else if(ph==='end')tx(w,{t:'act',a:{type:'endTurn'}});else break}
 if(S().turn.phase==='buy'){tx(W(),{t:'act',a:{type:'decline'}});ok(S().auction&&S().auction.left===20,'leilão iniciado');R.tickAll();const clk=A.out.filter(m=>m.t==='clk').pop();ok(clk&&clk.left===19,'relógio do leilão avança e é enviado em mensagem leve');}

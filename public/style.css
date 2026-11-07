@@ -43,7 +43,7 @@ h1,h2,h3,h4{margin:0}
 .tokens button{font-size:26px;padding:6px;background:var(--panel2);border:2px solid transparent;color:#000;box-shadow:none}
 .tokens button.sel{border-color:var(--gold);background:rgba(230,187,74,.2)}
 .plist .pl{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
-.plist .pl .tk{font-size:24px}
+.plist .pl .tk{position:static;transform:none;width:auto;height:auto;border:0;background:none!important;box-shadow:none;font-size:24px}
 .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 label{font-size:14px}
 
@@ -387,3 +387,12 @@ button,.sq,.chip,.pchip{touch-action:manipulation}
 
 .seized{margin:8px 0;padding:8px;border:1px dashed rgba(230,187,74,.55);border-radius:12px;background:rgba(230,187,74,.07)}
 .seized h3{font-size:12px;color:var(--gold);margin-bottom:4px}
+
+/* som, voz e juiz */
+.mediabar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.vnames{margin:0 0 8px;color:var(--gold)}
+.box2.case{border:1px solid var(--gold);background:rgba(230,187,74,.08)}
+.box2.case .cl{float:right;font-weight:800;color:var(--red)}
+.verd{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px}
+.verd button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;min-height:0;padding:7px 9px;font-weight:700}
+.verd button small{font-weight:500;opacity:.8;font-size:10.5px;line-height:1.2}

@@ -16,6 +16,8 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;600;700;800&display=swap" />
         <link rel="stylesheet" href="/style.css" />
         <Script src="/engine.js" strategy="beforeInteractive" />
+        <Script src="/sfx.js" strategy="beforeInteractive" />
+        <Script src="/voice.js" strategy="beforeInteractive" />
       </head>
       <body suppressHydrationWarning>{children}</body>
     </html>
