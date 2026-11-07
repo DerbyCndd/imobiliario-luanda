@@ -38,6 +38,7 @@ function connect() {
   w.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 's') { S = m.s; roomCode = S.code; wantCreate = false; sess(); render(); }
+    else if (m.t === 'ice') Voice.setIce(m.servers);
     else if (m.t === 'voice') Voice.setList(m.list);
     else if (m.t === 'vsig') Voice.signal(m.from, m.d);
     else if (m.t === 'clk' && S) { S.tl = m.tl; if (S.auction) S.auction.left = m.left; if (S.case) S.case.left = m.cl; updClock(); }
@@ -87,7 +88,7 @@ function mediaBarHtml() {
   return `<div class="mediabar"><button class="ghost sm" data-act="sfx" title="Ligar/desligar sons">${SFX.isMuted() ? '🔇 Sons' : '🔊 Sons'}</button>`
     + (V.joined ? `<button class="${V.muted ? 'ghost' : 'good'} sm" data-act="vmute">${V.muted ? '🔇 Microfone desligado' : '🎙️ Microfone ligado'}</button><button class="ghost sm" data-act="vleave">📞 Sair da voz</button>`
       : '<button class="alt sm" data-act="vjoin">🎙️ Entrar na chamada de voz</button>') + '</div>'
-    + (names.length ? `<p class="hint vnames">🎧 Na chamada: ${names.map(esc).join(', ')}</p>` : '')
+    + (V.list.length ? `<p class="hint vnames">🎧 Na chamada: ${V.list.map((id) => { const st = id === pid ? '' : V.joined ? ' ' + ({ ligado: '🟢', 'a ligar': '🟡', 'instável': '🟠', falhou: '🔴' }[V.state[id]] || '🟡') : ''; return esc(anyName(id) || '?') + (id === pid ? ' (tu)' : st); }).join(', ')}</p>${V.joined && V.list.some((id) => id !== pid && V.state[id] === 'falhou') ? '<p class="hint" style="color:#ff7b80">🔴 Algumas ligações falharam (rede restritiva). O servidor precisa de um TURN para chegar a toda a gente.</p>' : ''}${V.blocked ? '<p class="hint" style="color:#ffb347">🔈 O navegador bloqueou o som: toca em qualquer sítio do ecrã.</p>' : ''}` : '')
     + (V.error ? `<p class="hint" style="color:#ff7b80">${esc(V.error)}</p>` : '');
 }
 /* efeitos sonoros: esperam que os dados/peças assentem antes de tocar */

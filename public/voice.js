@@ -2,8 +2,8 @@
    WebRTC em malha (cada um liga-se a cada um); o servidor WebSocket só faz a sinalização. window.Voice */
 (function (root) {
   'use strict';
-  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
-  const V = { joined: false, muted: false, list: [], error: '', send: null, selfId: '', onChange() {} };
+  let ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }], iceCandidatePoolSize: 2 };
+  const V = { state: {}, joined: false, muted: false, list: [], error: '', send: null, selfId: '', onChange() {} };
   const peers = new Map(); // pid -> { pc, audio, queue, remote }
   let stream = null, box = null;
 
@@ -26,10 +26,19 @@
     peers.set(id, p);
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
     pc.onicecandidate = (e) => { if (e.candidate) sig(id, { c: e.candidate }); };
-    pc.ontrack = (e) => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
+    pc.ontrack = (e) => { audio.srcObject = e.streams[0]; audio.play().catch(() => { V.blocked = true; V.onChange(); }); };
+    V.state[id] = 'a ligar';
+    let dead = null;
+    const fail = () => { if (peers.get(id) !== p) return; closePeer(id); V.state[id] = 'falhou'; V.onChange(); setTimeout(sync, 2500); };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') { if (peers.get(id) === p) { closePeer(id); V.onChange(); } }
+      const st = pc.connectionState;
+      clearTimeout(dead);
+      if (st === 'connected') { V.state[id] = 'ligado'; V.onChange(); }
+      else if (st === 'failed' || st === 'closed') fail();
+      else if (st === 'disconnected') { V.state[id] = 'instável'; V.onChange(); dead = setTimeout(fail, 6000); }
     };
+    /* se a ligação não se estabelecer em 20 s, recomeça */
+    setTimeout(() => { if (peers.get(id) === p && pc.connectionState !== 'connected') fail(); }, 20000);
     if (initiator) {
       pc.onnegotiationneeded = async () => {
         try { const o = await pc.createOffer(); await pc.setLocalDescription(o); sig(id, { sdp: pc.localDescription }); } catch (e) {}
@@ -57,7 +66,7 @@
   function sync() {
     if (!V.joined) return;
     const others = V.list.filter((id) => id !== V.selfId);
-    for (const id of [...peers.keys()]) if (!others.includes(id)) closePeer(id);
+    for (const id of [...peers.keys()]) if (!others.includes(id)) { closePeer(id); delete V.state[id]; }
     for (const id of others) if (!peers.has(id) && V.selfId < id) makePeer(id, true);
   }
 
@@ -84,6 +93,14 @@
   };
   V.toggleMute = () => { V.muted = !V.muted; if (stream) stream.getAudioTracks().forEach((t) => { t.enabled = !V.muted; }); V.onChange(); };
   /* depois de reconectar ao servidor, voltar a anunciar que estamos na chamada */
-  V.resume = () => { if (V.joined && V.send) V.send({ t: 'vjoin' }); };
+  V.resume = () => {
+    if (!V.joined || !V.send) return;
+    for (const id of [...peers.keys()]) closePeer(id); // ligação ao servidor caiu: renegociar tudo
+    V.send({ t: 'vjoin' });
+  };
+  V.setIce = (servers) => { if (Array.isArray(servers) && servers.length) ICE = { iceServers: servers, iceCandidatePoolSize: 2 }; };
+  /* alguns navegadores (iOS) só tocam áudio depois de um toque: tenta de novo em qualquer toque */
+  V.unlock = () => { peers.forEach((p) => { if (p.audio.paused) p.audio.play().then(() => { V.blocked = false; V.onChange(); }).catch(() => {}); }); };
+  ['pointerdown', 'touchend', 'keydown'].forEach((ev) => root.addEventListener(ev, V.unlock, { passive: true }));
   root.Voice = V;
 })(typeof window !== 'undefined' ? window : this);
