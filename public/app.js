@@ -85,7 +85,7 @@ function leaveRoom() {
   ssSet('imobl_sess', ''); lsSet('imobl_last', ''); setNet(''); goHome();
 }
 function goHome() {
-  S = null; ui.lastSig = ''; ui.shown = {}; ui.diceSeq = -1; ui.cardSeq = 0; ui.dealsN = 0; ui.overShown = false; ui.snd = null;
+  S = null; ui.pubInit = false; ui.pubSeen = {}; ui.lastSig = ''; ui.shown = {}; ui.diceSeq = -1; ui.cardSeq = 0; ui.dealsN = 0; ui.overShown = false; ui.snd = null;
   $('#game').innerHTML = '';
   ['lobby', 'game', 'modal', 'cardpop'].forEach((i) => $('#' + i).classList.add('hidden'));
   $('#home').classList.remove('hidden');
@@ -122,7 +122,7 @@ function soundEvents() {
     else if (m && m.cash > ui.snd.cash) sfxLater(SFX.gain);
     else if (m && m.cash < ui.snd.cash) sfxLater(SFX.pay);
     if (jailed.length > ui.snd.jailed.length && jailed !== ui.snd.jailed) sfxLater(SFX.jail);
-    if (S.case && (!ui.snd.caseId || ui.snd.caseId !== S.case.id)) { SFX.alert(); if (S.case.voters.includes(pid)) toast('⚖️ Nova denúncia! Vota no painel de acções.', 5000); }
+    if (S.case && (!ui.snd.caseId || ui.snd.caseId !== S.case.id)) { SFX.alert(); if (S.case.accused.includes(pid)) toast('⚖️ Foste levado a julgamento! Tens 20 s para te defender.', 6000); else toast('⚖️ O Juiz Digital abriu um julgamento.', 4000); }
     if (S.verdict && S.verdict.seq > ui.snd.verdict) { SFX.gavel(); toast('⚖️ ' + S.verdict.text, 8000); }
     if (S.phase === 'play' && c.id === pid && !ui.snd.mine) SFX.turn();
     if (S.phase === 'over' && !ui.snd.over) SFX.win();
@@ -152,8 +152,10 @@ function render() {
   const sig = JSON.stringify(S, (k, v) => (k === 'left' || k === 'tl' ? undefined : v)) + '|' + pid + '|' + ui.tab + '|' + !!ui.sheet;
   if (sig === ui.lastSig) { updClock(); return; }
   ui.lastSig = sig;
+  const dt = $('#defText'), keep = dt ? { v: dt.value, f: document.activeElement === dt } : null;
   if (S.phase === 'lobby') { $('#game').classList.add('hidden'); $('#lobby').classList.remove('hidden'); renderLobby(); }
   else { $('#lobby').classList.add('hidden'); $('#game').classList.remove('hidden'); renderGame(); }
+  if (keep) { const n = $('#defText'); if (n) { n.value = keep.v; if (keep.f) n.focus(); } }
 }
 
 function updClock() {
@@ -171,13 +173,14 @@ function renderLobby() {
     const takenBy = S.players.find((p) => p.token === i), mine = takenBy && takenBy.id === pid;
     return `<button class="${mine ? 'sel' : ''}" data-act="token" data-token="${i}" ${takenBy && !mine ? 'disabled' : ''}>${t}</button>`;
   }).join('');
-  const pl = S.players.map((p) => `<div class="pl"><span class="tk">${tokenOf(p)}</span><b style="flex:1">${esc(p.name)}${p.id === S.hostPid ? ' 👑' : ''}${p.id === pid ? ' (tu)' : ''}</b><span class="dot" style="background:${p.connected ? '#2fb26a' : '#777'}"></span>${isHost && p.id !== pid ? `<button class="sm ghost" data-act="kick" data-pid="${p.id}">Expulsar</button>` : ''}</div>`).join('');
+  const pl = S.players.map((p) => `<div class="pl"><span class="tk">${tokenOf(p)}</span><b style="flex:1">${esc(p.name)}${p.id === S.hostPid ? ' 👑' : ''}${p.id === pid ? ' (tu)' : ''}</b><span class="dot" style="background:${p.connected ? '#2fb26a' : '#777'}"></span>${p.bot ? `<small class="hint" style="margin:0">${esc(p.style)}</small>` : ''}${isHost && p.id !== pid ? `<button class="sm ghost" data-act="kick" data-pid="${p.id}">${p.bot ? 'Remover' : 'Expulsar'}</button>` : ''}</div>`).join('');
   $('#lobby').innerHTML = `
   <div class="hero"><div class="logo">🏠🎩</div><h1>SALA DE ESPERA</h1></div>
   <div class="card"><h2>Código da sala</h2><div class="code">${S.code}</div>
     <p class="hint">Os amigos abrem o jogo e entram com este código, ou usam directamente o link:</p>
     <div class="row"><input readonly value="${esc(link)}" id="lnk" onclick="this.select()"><button class="alt" data-act="copy">Copiar link</button></div></div>
-  <div class="card"><h2>Jogadores (${S.players.length}/12)</h2><div class="plist">${pl}</div></div>
+  <div class="card"><h2>Jogadores (${S.players.length}/12)</h2><div class="plist">${pl}</div>
+    ${isHost ? `<div class="row" style="margin-top:8px"><button class="alt sm" data-act="addBot" ${S.players.length >= 12 ? 'disabled' : ''}>🤖 Adicionar bot</button><button class="ghost sm" data-act="addBot" data-style="agressivo" ${S.players.length >= 12 ? 'disabled' : ''}>Agressivo</button><button class="ghost sm" data-act="addBot" data-style="cauteloso" ${S.players.length >= 12 ? 'disabled' : ''}>Cauteloso</button><button class="ghost sm" data-act="addBot" data-style="negociador" ${S.players.length >= 12 ? 'disabled' : ''}>Negociador</button></div><p class="hint">Os bots jogam como qualquer jogador: compram, licitam, constroem, negoceiam e pedem empréstimos. Perante o Juiz têm os mesmos deveres.</p>` : ''}</div>
   <div class="card"><h2>A tua peça</h2><div class="tokens">${tk}</div></div>
   <div class="card"><h2>Som e voz</h2>${mediaBarHtml()}<p class="hint">A chamada de voz é entre todos os que estão na sala, incluindo quem estiver só a assistir.</p></div>
   ${isHost ? `<div class="card"><h2>Regras da casa</h2>
@@ -185,6 +188,7 @@ function renderLobby() {
     <label>Salário ao passar pela Partida <input type="number" id="setGo" value="${S.settings.go || 500}" min="100" max="2000" step="50" style="width:110px"></label>
     <label>O banco limita as casas e hotéis? <select id="setLimit"><option value="1" ${S.settings.limitHouses !== false ? 'selected' : ''}>Sim: 32 casas e 12 hotéis (mais com +8 jogadores)</option><option value="0" ${S.settings.limitHouses === false ? 'selected' : ''}>Não: casas e hotéis ilimitados</option></select></label>
     <label><input type="checkbox" id="setLate" ${S.settings.lateJoin !== false ? 'checked' : ''}> Permitir entrar a meio da partida (só nas 2 primeiras rondas; depois assistem)</label>
+    <label>⚖️ Juiz Digital <select id="setJudge">${[['guard', 'Vigia: veta propostas abusivas e julga denúncias'], ['warn', 'Aviso: só avisa nas propostas e julga denúncias'], ['off', 'Só julga denúncias (sem pareceres)']].map(([v, l]) => `<option value="${v}" ${(S.settings.judgeMode || 'guard') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label><input type="checkbox" id="setPot" ${S.settings.pot ? 'checked' : ''}> Multas e impostos acumulam no Parque Gratuito</label>
     <label>Tempo por jogada <select id="setTime">${[[0, 'Sem limite'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']].map(([v, l]) => `<option value="${v}" ${S.settings.turnTime === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
     <p class="hint">Se alguém demorar mais que o tempo, o jogo joga a vez por essa pessoa; depois de 2 vezes seguidas passa a modo automático até voltar a clicar.</p>
@@ -291,19 +295,27 @@ function deedHtml(i) {
 
 /* ---------- painéis ---------- */
 /* ---------- juiz: denúncia em julgamento ---------- */
-const VDESC = { fine: 'Cada acusado paga a multa ao banco', seize: 'As propriedades da troca voltam ao banco', return: 'A troca é anulada e cada um recebe o que deu', comp: 'Os acusados indemnizam quem denunciou', void: 'Quem denunciou indemniza os acusados' };
+const LAWTXT = (n) => (E.Judge.LAWS[n] ? 'Art. ' + n + ' – ' + E.Judge.LAWS[n].t : '');
+function judgeNote(rv) {
+  if (!rv) return '';
+  const cls = rv.level === 'warn' ? 'jwarn' : 'jnote';
+  return '<div class="jnote2 ' + cls + '">⚖️ <b>Juiz Digital</b>: ' + esc(rv.msg) + (rv.law ? ' <small>(' + esc(LAWTXT(rv.law)) + ')</small>' : '') + '</div>';
+}
 function caseHtml() {
   const c = S.case; if (!c) return '';
   const d = S.deals.find((x) => x.id === c.deal); if (!d) return '';
-  const pen = E.casePen(d), voted = c.voters.filter((id) => c.votes[id]).length, juror = c.voters.includes(pid);
-  let h = `<div class="box2 case"><b>⚖️ Denúncia em julgamento</b> <span class="cl" id="caseLeft">${c.left}s</span><br>
+  const an = d.an || {}, pen = E.casePen(d), accused = c.accused.includes(pid), ruling = c.phase === 'ruling';
+  const flagTxt = { SHAM: 'monopólio oferecido', GIFT: 'doação simulada', PREDATION: 'aproveitamento da fragilidade', EVASION: 'dissipação de bens', HARD: 'negócio duro' };
+  let h = `<div class="box2 case"><b>⚖️ Tribunal do Juiz Digital</b> ${ruling ? '<span class="cl">a deliberar…</span>' : `<span class="cl" id="caseLeft">${c.left}s</span>`}<br>
     <b>${esc(nameOf(c.by))}</b> denunciou a troca entre <b>${esc(nameOf(d.a))}</b> e <b>${esc(nameOf(d.b))}</b>:<br>
     ${esc(nameOf(d.a))} deu: ${esc(sideDesc(d.give))} · ${esc(nameOf(d.b))} deu: ${esc(sideDesc(d.get))}
-    ${c.reason ? `<br><i>“${esc(c.reason)}”</i>` : ''}<br><small>Jurados (${voted}/${c.voters.length} votaram): ${c.voters.map((id) => esc(nameOf(id)) + (c.votes[id] ? ' ✔' : '')).join(', ')} · valor da multa/indemnização: até ${kz(pen)}</small>`;
-  if (juror) {
-    h += `<p style="margin:8px 0 4px"><b>${c.votes[pid] ? 'O teu voto: ' + esc(E.VERDICTS[c.votes[pid]]) + ' (podes mudar)' : 'Vota no veredicto:'}</b></p><div class="verd">`
-      + Object.keys(E.VERDICTS).map((k) => `<button class="${c.votes[pid] === k ? 'good' : 'alt'} sm" data-act="vote" data-v="${k}" title="${esc(VDESC[k])}">${esc(E.VERDICTS[k])}<small>${esc(VDESC[k])}</small></button>`).join('') + '</div>';
-  } else h += '<p class="hint" style="margin:6px 0 0">Os jogadores que não estão envolvidos decidem por maioria; em caso de empate a denúncia é arquivada.</p>';
+    ${c.reason ? `<br><i>“${esc(c.reason)}”</i>` : ''}
+    <br><small>Análise do Juiz: equilíbrio ${Math.round((an.fair || 0) * 100)}%${an.flags && an.flags.length ? ' · indícios: ' + an.flags.map((f) => flagTxt[f] || f).join(', ') : ' · sem indícios'} · multa/indemnização até ${kz(pen)}</small>`;
+  const defs = Object.keys(c.defs || {});
+  if (defs.length) h += '<div style="margin-top:6px">' + defs.map((id) => '🛡️ <b>' + esc(nameOf(id)) + '</b>: ' + esc(c.defs[id])).join('<br>') + '</div>';
+  if (!ruling && accused && !c.defs[pid]) h += '<div class="row" style="margin-top:8px"><input id="defText" maxlength="160" placeholder="A tua defesa (opcional)"><button class="good sm" data-act="defend">Defender-me</button></div>';
+  else if (!ruling) h += '<p class="hint" style="margin:6px 0 0">O Juiz ouve a defesa dos acusados e decide segundo o Código de Leis. Não há votação.</p>';
+  else h += '<p class="hint" style="margin:6px 0 0">O Juiz está a ponderar o processo…</p>';
   return h + '</div>';
 }
 function spectatorHtml() {
@@ -412,20 +424,20 @@ function historyHtml() {
   if (!list.length) return '';
   return '<h3 style="margin:12px 0 6px">📜 Trocas concluídas</h3>' + list.map((d) => `<div class="box2"><b>${esc(nameOf(d.a))}</b> deu: ${esc(sideDesc(d.give))}<br><b>${esc(nameOf(d.b))}</b> deu: ${esc(sideDesc(d.get))}
     <div class="acts"><small class="hint" style="margin:0;flex:1">Ronda ${d.round}${d.verdict ? ' · ⚖️ ' + esc(E.VERDICTS[d.verdict]) : d.rep ? ' · ⚖️ em julgamento' : ''}</small>
-    ${!d.rep && !isSpec() ? `<button class="ghost sm" data-act="report" data-id="${d.id}" ${canRep ? '' : 'disabled'} title="Denunciar esta troca como suspeita; os outros jogadores votam o veredicto">🚩 Denunciar</button>` : ''}</div></div>`).join('')
-    + '<p class="hint">Se achares uma troca suspeita (conluio, preço absurdo), denuncia: os jogadores fora do negócio votam multar, confiscar, devolver, indemnizar ou invalidar a denúncia.</p>';
+    ${!d.rep && !isSpec() ? `<button class="ghost sm" data-act="report" data-id="${d.id}" ${canRep ? '' : 'disabled'} title="Levar esta troca ao Juiz Digital">🚩 Denunciar</button>` : ''}</div></div>`).join('')
+    + '<p class="hint">⚖️ O <b>Juiz Digital</b> (não é jogador) analisa cada proposta e julga as denúncias segundo o Código de Leis: ouve a defesa e decide multar, confiscar, devolver, advertir ou dar a denúncia como infundada. Denunciar sem razão custa dinheiro.</p>';
 }
 function dealsHtml() {
   const mineT = S.trades.filter((t) => t.from === pid || t.to === pid), mineL = S.lreq.filter((r) => r.from === pid || r.to === pid);
   if (!mineT.length && !mineL.length) return (isSpec() ? ((S.deals || []).length ? '' : '<p class="hint">Ainda não houve trocas nesta partida.</p>') : '<p class="hint">Sem propostas pendentes. Usa os botões 🤝 Troca e 💸 Pedir a jogador.</p>') + historyHtml();
   const trades = mineT.map((t) => {
     const a = E.byId(S, t.from), b = E.byId(S, t.to), inc = t.to === pid;
-    return `<div class="box2"><b>🤝 ${esc(a.name)}</b> dá: ${esc(sideDesc(t.give))}<br><b>${esc(b.name)}</b> dá: ${esc(sideDesc(t.get))}
+    return `<div class="box2"><b>🤝 ${esc(a.name)}</b> dá: ${esc(sideDesc(t.give))}<br><b>${esc(b.name)}</b> dá: ${esc(sideDesc(t.get))}${judgeNote(t.rv)}
       <div class="acts">${inc ? `<button class="good sm" data-act="tradeYes" data-id="${t.id}">Aceitar</button><button class="ghost sm" data-act="tradeNo" data-id="${t.id}">Recusar</button>` : `<button class="ghost sm" data-act="tradeNo" data-id="${t.id}">Cancelar</button>`}</div></div>`;
   }).join('');
   const loans = mineL.map((r) => {
     const a = E.byId(S, r.from), inc = r.to === pid, tot = E.loanTotal(r.amount, r.rate);
-    return `<div class="box2"><b>💸 ${esc(a.name)}</b> pede <b>${kz(r.amount)}</b> a ${esc(E.byId(S, r.to).name)}<br>Juros ${r.rate}% (total ${kz(tot)}) · ${r.n} rondas (~${kz(Math.ceil(tot / r.n))}/ronda)<br>Penalização: ${penTxt(r.pen)}
+    return `<div class="box2"><b>💸 ${esc(a.name)}</b> pede <b>${kz(r.amount)}</b> a ${esc(E.byId(S, r.to).name)}<br>Juros ${r.rate}% (total ${kz(tot)}) · ${r.n} rondas (~${kz(Math.ceil(tot / r.n))}/ronda)<br>Penalização: ${penTxt(r.pen)}${judgeNote(r.rv)}
       <div class="acts">${inc ? `<button class="good sm" data-act="loanYes" data-id="${r.id}">Emprestar</button><button class="ghost sm" data-act="loanNo" data-id="${r.id}">Recusar</button>` : `<button class="ghost sm" data-act="loanNo" data-id="${r.id}">Cancelar</button>`}</div></div>`;
   }).join('');
   return trades + loans + historyHtml();
@@ -470,6 +482,7 @@ function ensureSkeleton() {
     <div class="center" id="center"><div class="turnpill" id="pill"></div>
       <div><div class="plate">IMOBILIÁRIO<br>LUANDA<small>♦ ♦ ♦</small></div></div>
       <div class="dicebox">${dieHtml(0)}${dieHtml(1)}</div>
+      <div id="tradeCenter" class="tcenter hidden"></div>
       <div><div class="evt" id="evt"></div><div id="potbox" style="text-align:center"></div></div></div>
     <div id="toks"></div></div></div></main>
   <aside class="colR"><div class="panel" id="act"></div>
@@ -479,12 +492,39 @@ function ensureSkeleton() {
   setDice(S.turn.dice, false);
   ui.diceSeq = S.turn.seq;
 }
+/* ---------- mesa de negociação: o que se está a trocar é público, no centro do tabuleiro ---------- */
+const PUBTTL = 14000;
+function tradeCenterHtml() {
+  const now = Date.now();
+  ui.pubSeen = ui.pubSeen || {};
+  if (!ui.pubInit) { (S.pub || []).forEach((e) => { ui.pubSeen[e.id] = 0; }); ui.pubInit = true; } /* ao entrar/reconectar não mostra o histórico antigo */
+  (S.pub || []).forEach((e) => { if (ui.pubSeen[e.id] === undefined) ui.pubSeen[e.id] = now; });
+  const recent = (S.pub || []).filter((e) => now - ui.pubSeen[e.id] < PUBTTL).slice(-3);
+  clearTimeout(ui.pubTimer);
+  const next = recent.length ? Math.min(...recent.map((e) => PUBTTL - (now - ui.pubSeen[e.id]))) : 0;
+  if (next > 0) ui.pubTimer = setTimeout(() => { ui.lastSig = ''; render(); }, next + 50);
+  const lab = { ok: ['✅ Fechado', 'ok'], no: ['❌ Recusada', 'no'], cancel: ['↩️ Cancelada', 'no'], veto: ['⚖️ Vetada pelo Juiz', 'veto'] };
+  const who = (id) => { const p = E.byId(S, id); return p ? `<b>${tokenOf(p)} ${esc(p.name)}</b>` : '?'; };
+  const trade = (t, tag, cls, note) => `<div class="tc ${cls}"><div class="tch">${tag}</div>
+    <div class="tcr">${who(t.from)} dá <span>${esc(sideDesc(t.give))}</span></div>
+    <div class="tcr">${who(t.to)} dá <span>${esc(sideDesc(t.get))}</span></div>${note || ''}</div>`;
+  const loan = (r, tag, cls) => `<div class="tc ${cls}"><div class="tch">${tag}</div><div class="tcr">${who(r.to)} empresta <span>${kz(r.amount)}</span> a ${who(r.from)} · juros ${r.rate}% · ${r.n} rondas</div></div>`;
+  let h = '';
+  S.trades.slice(-3).forEach((t) => { h += trade(t, '🤝 Proposta de troca · a aguardar resposta', 'wait', t.rv && t.rv.level === 'warn' ? `<div class="tcn">⚖️ ${esc(t.rv.msg)}</div>` : ''); });
+  S.lreq.slice(-2).forEach((r) => { h += loan(r, '💸 Pedido de empréstimo · a aguardar resposta', 'wait'); });
+  recent.forEach((e) => {
+    const [tag, cls] = lab[e.st] || ['', ''];
+    h += e.k === 'loan' ? loan(e, '💸 ' + tag.replace(/^\S+ /, ''), cls) : trade(e, tag, cls, e.st === 'veto' ? `<div class="tcn">Art. ${e.law}: ${esc(e.msg || '')}</div>` : '');
+  });
+  return h;
+}
 function lastEvent() { for (let i = S.log.length - 1; i >= 0; i--) if (typeof S.log[i] === 'string') return S.log[i]; return ''; }
 function renderGame() {
   ensureSkeleton();
   if (isSpec() && (ui.tab === 'props' || ui.tab === 'loans')) ui.tab = 'players';
   const c = E.cur(S);
   $('#sqs').innerHTML = squaresHtml();
+  { const tc = $('#tradeCenter'), th = S.phase === 'over' ? '' : tradeCenterHtml(); tc.innerHTML = th; tc.classList.toggle('hidden', !th); }
   $('#pill').innerHTML = S.phase === 'over' ? '🏆 Fim de jogo' : `<span class="av" style="background:${pcol(c)}">${tokenOf(c)}</span>${c.id === pid ? 'A tua vez' : 'Vez de ' + esc(c.name)}${c.auto ? ' 🤖' : ''}<span class="tlv hidden" id="tlv"></span>`;
   $('#evt').textContent = lastEvent();
   updClock();
@@ -562,7 +602,10 @@ function tradeModal() {
       ${props.map((i) => `<label><input type="checkbox" data-tprop="${key}" value="${i}" ${T[key].props.includes(i) ? 'checked' : ''}><span style="display:inline-block;width:10px;height:14px;border:1px solid #000;background:${propColor(i)}"></span>${esc(B[i].n)}${S.props[i].mort ? ' (hip.)' : ''}</label>`).join('') || '<p class="hint">Sem propriedades</p>'}
       ${who.jc.length ? `<label>Cartas Sai da Cadeia: <input type="number" min="0" max="${who.jc.length}" value="${T[key].jc}" data-tjc="${key}" style="width:60px"></label>` : ''}</div>`;
   };
-  return h + `<div class="cols">${side(m, 'give')}${side(o, 'get')}</div><div class="acts"><button class="good" data-act="sendTrade">Enviar proposta</button></div>`;
+  const empty = !T.give.cash && !T.give.props.length && !T.give.jc && !T.get.cash && !T.get.props.length && !T.get.jc;
+  const rv = empty || (S.settings.judgeMode || 'guard') === 'off' ? null : E.Judge.reviewTrade(E, S, { from: pid, to: T.to, give: T.give, get: T.get });
+  const veto = rv && rv.level === 'veto' && (S.settings.judgeMode || 'guard') === 'guard';
+  return h + `<div class="cols">${side(m, 'give')}${side(o, 'get')}</div>${rv && rv.level !== 'ok' ? `<div class="jnote2 ${veto ? 'jveto' : rv.level === 'note' ? 'jnote' : 'jwarn'}">⚖️ <b>Juiz Digital${veto ? ' (vetaria esta proposta)' : ''}</b>: ${esc(rv.msg)} <small>(${esc(LAWTXT(rv.law))})</small></div>` : ''}<div class="acts"><button class="good" data-act="sendTrade" ${veto ? 'disabled' : ''}>Enviar proposta</button></div>`;
 }
 function refreshTrade() { $('#modal .box').innerHTML = tradeModal() + '<p style="text-align:right;margin:12px 0 0"><button class="ghost" data-close="1">Fechar</button></p>'; }
 
@@ -621,7 +664,7 @@ document.addEventListener('click', (ev) => {
     case 'leave': if (!local && S.phase === 'play' && !confirm('Sair desta sala? Podes voltar a entrar com o mesmo código.')) break; leaveRoom(); break;
     case 'token': dispatch({ type: 'token', token: +t.dataset.token }); break;
     case 'kick': dispatch({ type: 'kick', pid: t.dataset.pid }); break;
-    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, go: +$('#setGo').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value, limitHouses: $('#setLimit').value === '1', lateJoin: $('#setLate').checked }); dispatch({ type: 'start' }); break;
+    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, go: +$('#setGo').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value, limitHouses: $('#setLimit').value === '1', lateJoin: $('#setLate').checked, judgeMode: $('#setJudge').value }); dispatch({ type: 'start' }); break;
     case 'sfx': SFX.setMuted(!SFX.isMuted()); ui.lastSig = ''; render(); break;
     case 'vjoin': Voice.join(); break;
     case 'vleave': Voice.leave(); break;
@@ -636,7 +679,8 @@ document.addEventListener('click', (ev) => {
     }
     case 'vmute': Voice.toggleMute(); break;
     case 'report': { const why = prompt('Motivo da denúncia (opcional):', ''); if (why === null) break; dispatch({ type: 'report', deal: +t.dataset.id, reason: why }); break; }
-    case 'vote': dispatch({ type: 'vote', v: t.dataset.v }); break;
+    case 'defend': { const i = $('#defText'); dispatch({ type: 'defend', text: i ? i.value : '' }); break; }
+    case 'addBot': dispatch({ type: 'addBot', style: t.dataset.style }); break;
     case 'bidrel': dispatch({ type: 'bid', amount: S.auction.bid + (+t.dataset.add) }); break;
     case 'bidcustom': dispatch({ type: 'bid', amount: +$('#bidAmt').value }); break;
     case 'chat': { const i = $('#chatIn'); if (i.value.trim()) { dispatch({ type: 'chat', text: i.value }); i.value = ''; } break; }
@@ -652,9 +696,12 @@ document.addEventListener('change', (ev) => {
   if (t.dataset.tprop) { const l = T[t.dataset.tprop].props, v = +t.value; if (t.checked) l.push(v); else l.splice(l.indexOf(v), 1); }
   else if (t.dataset.tcash) T[t.dataset.tcash].cash = Math.max(0, Math.floor(+t.value || 0));
   else if (t.dataset.tjc) T[t.dataset.tjc].jc = Math.max(0, Math.floor(+t.value || 0));
+  else return;
+  const sc = ($('#modal .box') || {}).scrollTop; refreshTrade(); if (sc) $('#modal .box').scrollTop = sc; /* actualiza o parecer do Juiz */
 });
 document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Enter') return;
+  if (ev.target.id === 'defText') { dispatch({ type: 'defend', text: ev.target.value }); return; }
   if (ev.target.id === 'chatIn' && ev.target.value.trim()) { dispatch({ type: 'chat', text: ev.target.value }); ev.target.value = ''; }
   else if (ev.target.id === 'bidAmt') dispatch({ type: 'bid', amount: +ev.target.value });
 });

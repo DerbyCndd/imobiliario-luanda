@@ -398,3 +398,23 @@ button,.sq,.chip,.pchip{touch-action:manipulation}
 .verd button small{font-weight:500;opacity:.8;font-size:10.5px;line-height:1.2}
 
 .diag{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.diag th,.diag td{padding:5px 6px;text-align:left;border-bottom:1px solid var(--line)}
+
+/* Juiz Digital */
+.jnote2{margin:8px 0 0;padding:7px 9px;border-radius:9px;font-size:12.5px;line-height:1.35;border:1px solid var(--line)}
+.jnote2 small{opacity:.8}
+.jnote{background:rgba(120,160,255,.10);border-color:rgba(120,160,255,.4)}
+.jwarn{background:rgba(255,190,60,.12);border-color:rgba(255,190,60,.55)}
+.jveto{background:rgba(255,80,80,.14);border-color:rgba(255,80,80,.6)}
+.box2.case input{flex:1;min-width:0}
+
+/* Mesa de negociação pública (centro do tabuleiro) */
+.tcenter{position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;gap:1cqw;pointer-events:none;max-height:92%;overflow:hidden}
+.tcenter.hidden{display:none}
+.tc{background:rgba(14,22,18,.93);border:1px solid rgba(230,187,74,.7);border-radius:1.4cqw;padding:1.1cqw 1.6cqw;color:#f3ead0;font-size:clamp(9px,2.05cqw,15px);line-height:1.3;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.tc .tch{font-weight:800;color:#e6bb4a;font-size:.92em;margin-bottom:.3cqw}
+.tc .tcr b{color:#fff}.tc .tcr span{color:#ffe9a8;font-weight:700}
+.tc.wait{border-color:rgba(120,170,255,.8)}.tc.wait .tch{color:#9fc2ff}
+.tc.ok{border-color:#2fb26a}.tc.ok .tch{color:#5be39a}
+.tc.no{border-color:#c0645f}.tc.no .tch{color:#ff9d97}
+.tc.veto{border-color:#ffb53d;background:rgba(40,28,10,.95)}.tc.veto .tch{color:#ffc766}
+.tc .tcn{margin-top:.3cqw;font-size:.88em;opacity:.9}

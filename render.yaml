@@ -9,6 +9,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Juiz com IA (opcional): sem chave decide o juiz de regras (offline). Modelo por defeito: claude-haiku-5-5
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: JUDGE_MODEL
+        sync: false
       # Chamada de voz em redes restritivas (opcional): conta grátis em metered.ca
       - key: METERED_DOMAIN
         sync: false

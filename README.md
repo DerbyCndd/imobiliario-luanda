@@ -11,7 +11,9 @@ criador feche a página (os jogadores reconectam sozinhos).
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm test         # simula centenas de jogos + testa as salas
+npm test         # motor, salas, empréstimos, Juiz (casos rotulados) e teste de caos
+npm run sim      # 60 jogos só com bots: terminam? quantas trocas/empréstimos?
+node judge/train.js [--tune [--write]]   # avalia/afina o Juiz com judge/cases.json
 ```
 
 ## Pôr online (Render, grátis)
@@ -29,9 +31,15 @@ cartas de Sorte e Caixa Comunitária (16+16), **trocas**, dívidas, falência, v
 **Espectadores e entrada a meio:** quem entra numa partida a decorrer joga se ainda estivermos nas 2 primeiras rondas (com o dinheiro inicial); depois assiste, conversa e fala na chamada de voz.
 **Economia:** a Partida paga 500 Kz (o anfitrião ajusta no lobby), recompensas das cartas até 150 Kz, renda base ≈ 14% do preço da rua e construção mais cara.
 **Limite de casas:** o anfitrião escolhe no lobby se o banco limita casas e hotéis (32/12, escalável) ou se são ilimitados.
-**Juiz por votação:** qualquer jogador pode denunciar uma das últimas trocas; os jogadores fora do negócio votam (60 s) multar, confiscar, devolver, indemnizar o denunciante ou invalidar a denúncia (o denunciante indemniza). Maioria decide; empate arquiva.
+**⚖️ Juiz Digital (não é jogador):** um agente imparcial com um Código de Leis (`judge/leis.md`, 10 artigos). Analisa **cada proposta de troca e de empréstimo** antes de ser aceite (modo da sala: *Vigia* veta as claramente abusivas, *Aviso* só avisa, *Desligado*) e julga as **denúncias**: ouve a defesa dos acusados (20 s) e decide multar, confiscar, devolver, devolver e multar, advertir ou dar a denúncia por infundada (quem denuncia sem razão paga; 2 denúncias infundadas tiram o direito de denunciar). Reincidência agrava a pena. Funciona offline (`public/judge.js`); com `ANTHROPIC_API_KEY` no servidor o **Claude** julga com as mesmas leis (`lib/llm-judge.js`, modelo `JUDGE_MODEL`, por defeito `claude-haiku-5-5`), sempre validado pelo juiz de base: respostas inválidas, lentas ou que se afastem mais de um degrau de severidade caem para o juiz de base.
+**🤖 Bots:** o anfitrião adiciona bots no lobby (estilos equilibrado, agressivo, cauteloso, negociador). Jogam como qualquer jogador (compram, licitam, constroem, hipotecam, negoceiam trocas, pedem e dão empréstimos, defendem-se em tribunal e podem denunciar abusos) e respeitam o Juiz. Código em `public/bots.js`.
 **Sons e voz:** efeitos sonoros sintetizados (dados, passos, dinheiro, cartas, leilão, veredicto) e chamada de voz WebRTC em malha entre todos os da sala (o servidor só faz a sinalização; precisa de HTTPS e, em redes restritivas, pode precisar de um servidor TURN).
 Para a voz chegar a toda a gente (redes móveis/CGNAT) define no Render `METERED_DOMAIN` e `METERED_API_KEY` (conta grátis em metered.ca) ou `TURN_URLS`, `TURN_USERNAME` e `TURN_CREDENTIAL`.
 Regra opcional: multas e impostos acumulam no Parque Gratuito.
 
 *Jogo de fãs, sem ligação à Hasbro. "Monopoly" é marca registada dos seus titulares.*
+
+## Juiz e bots: treino e verificação
+- `judge/cases.json`: processos rotulados à mão (veredicto aceitável + reacção esperada à proposta). **Acrescenta um caso sempre que um julgamento te parecer injusto.** `node judge/train.js --tune` procura limiares melhores; é afinação de parâmetros, não aprendizagem automática.
+- `test-chaos.js`: bots + jogadores maliciosos (trocas abusivas, denúncias a esmo, defesas com injecção de instruções) com verificação de invariantes.
+- `.claude/skills/juiz-imobiliario`, `.claude/skills/bots-imobiliario` e `.claude/agents/juiz-imobiliario.md`: procedimento para o Claude Code julgar casos e afinar o juiz/bots.

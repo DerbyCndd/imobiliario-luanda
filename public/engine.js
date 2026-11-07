@@ -107,8 +107,8 @@
 
   function newGame(code, hostPid) {
     return {
-      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, go: 500, pot: false, turnTime: 60, limitHouses: true, lateJoin: true }, tl: 0, tk: '',
-      players: [], specs: [], round: 1, deals: [], did: 0, case: null, cid: 0, verdict: null, cur: 0, props: {}, houses: 32, hotels: 12,
+      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, go: 500, pot: false, turnTime: 60, limitHouses: true, lateJoin: true, judgeMode: 'guard' }, tl: 0, tk: '',
+      players: [], specs: [], round: 1, deals: [], did: 0, case: null, cid: 0, verdict: null, rec: {}, pub: [], pubn: 0, cur: 0, props: {}, houses: 32, hotels: 12,
       turn: { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 },
       debts: [], auction: null, aq: [], seized: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
       card: null, cardSeq: 0, decks: { chance: [], cc: [] }, winner: null,
@@ -156,7 +156,7 @@
     S.decks.chance = shuffle(CARDS.chance.map((_, i) => i));
     S.decks.cc = shuffle(CARDS.cc.map((_, i) => i));
     /* até 8 jogadores: 32 casas e 12 hotéis; acima disso o banco ganha 4 casas e 1,5 hotéis por jogador */
-    S.round = 1; S.deals = []; S.did = 0; S.case = null; S.verdict = null;
+    S.round = 1; S.deals = []; S.did = 0; S.case = null; S.verdict = null; S.rec = {}; S.pub = []; S.pubn = 0;
     /* sem limite: o banco "tem" casas de sobra (9999) */
     S.houseMax = S.settings.limitHouses === false ? 9999 : Math.max(32, 4 * S.players.length);
     S.hotelMax = S.settings.limitHouses === false ? 9999 : Math.max(12, Math.ceil(1.5 * S.players.length));
@@ -363,7 +363,10 @@
   function tick(S) {
     if (S.phase !== 'play') return 0;
     let ret = 0;
-    if (S.case) { ret = 1; if (--S.case.left <= 0 || caseDone(S)) { resolveCase(S); ret = 2; } }
+    if (S.case) {
+      ret = 1;
+      if (S.case.phase === 'hearing' && (--S.case.left <= 0 || caseDone(S))) { ruleCase(S); ret = 2; }
+    }
     if (S.auction) {
       ret = 1;
       if (--S.auction.left <= 0) { finishAuction(S); ret = 2; }
@@ -395,6 +398,7 @@
     S.debts.forEach((d) => { if (d.to === pid) d.to = 'bank'; });
     S.trades = S.trades.filter((t) => t.from !== pid && t.to !== pid);
     S.lreq = S.lreq.filter((r) => r.from !== pid && r.to !== pid);
+    if (S.case && (S.case.by === pid || S.case.accused.includes(pid))) { S.case = null; log(S, '⚖️ O processo foi arquivado: um dos envolvidos saiu do jogo.'); }
     S.loans = S.loans.filter((l) => l.borrower !== pid);
     const heir = !forceBank && S.debts.find((d) => d.pid === pid);
     S.loans.forEach((l) => { if (l.lender === pid) l.lender = heir && heir.to !== 'bank' ? heir.to : 'bank'; });
@@ -526,6 +530,7 @@
   }
   function execTrade(S, t) {
     const a = byId(S, t.from), b = byId(S, t.to);
+    const an = JG().analyzeTrade(E, S, a.id, b.id, t.give, t.get); /* parecer do Juiz com o estado ANTES da troca (fica no processo) */
     a.cash += t.get.cash - t.give.cash; b.cash += t.give.cash - t.get.cash;
     t.give.props.forEach((i) => { S.props[i].owner = b.id; if (S.props[i].mort) b.cash -= Math.ceil(BOARD[i].p * 0.05); });
     t.get.props.forEach((i) => { S.props[i].owner = a.id; if (S.props[i].mort) a.cash -= Math.ceil(BOARD[i].p * 0.05); });
@@ -534,15 +539,17 @@
     log(S, 'Troca concluída entre ' + a.name + ' e ' + b.name + '.');
     const snap = (x) => ({ cash: x.cash, props: x.props.slice(), jc: x.jc });
     S.deals = S.deals || [];
-    S.deals.push({ id: ++S.did, a: a.id, b: b.id, give: snap(t.give), get: snap(t.get), round: S.round, rep: false });
+    S.deals.push({ id: ++S.did, a: a.id, b: b.id, give: snap(t.give), get: snap(t.get), round: S.round, rep: false, an });
     if (S.deals.length > 12) S.deals.shift();
   }
 
-  /* ------------------------------------------------------------------ JUIZ (denúncias de trocas suspeitas, decididas por votação) */
-  const VERDICTS = { fine: 'Multar', seize: 'Confiscar', return: 'Devolver', comp: 'Indemnizar quem denunciou', void: 'Denúncia inválida' };
+  /* ------------------------------------------------------------------ JUIZ DIGITAL (agente imparcial, não é jogador)
+     Julga as denúncias segundo o Código de Leis (public/judge.js). Em salas com ANTHROPIC_API_KEY o servidor
+     pede o parecer ao Claude (lib/llm-judge.js) e aplica-o através de E.rule(); sem chave decide o juiz de base. */
+  const JG = () => E.Judge || root.Judge;
+  const VERDICTS = { fine: 'Multar', seize: 'Confiscar', return: 'Devolver', comp: 'Indemnizar quem denunciou', void: 'Denúncia inválida', warn: 'Advertir', returnfine: 'Devolver e multar' };
   const dealValue = (d) => d.give.cash + d.get.cash + [...d.give.props, ...d.get.props].reduce((s, i) => s + BOARD[i].p, 0);
-  const casePen = (d) => Math.min(400, Math.max(50, Math.round((dealValue(d) * 0.15) / 10) * 10));
-  const caseNeeded = (S) => S.case.voters.filter((id) => { const p = byId(S, id); return p && !p.bk && !p.auto; });
+  const casePen = (d, mult) => Math.min(600, Math.max(50, Math.round((dealValue(d) * 0.15 * (mult || 1)) / 10) * 10));
   function transfer(S, from, to, amt) {
     const pay = Math.max(0, Math.min(amt, from.cash));
     from.cash -= pay;
@@ -555,47 +562,101 @@
     st.houses = 0; st.owner = null; st.mort = false;
     S.seized = S.seized || []; if (!S.seized.includes(i)) S.seized.push(i);
   }
-  function resolveCase(S) {
+  const recOf = (S, pid) => JG().rec(S, pid);
+  /* aplica a sentença (ruling = { verdict, laws, why, mult, by }) */
+  function resolveCase(S, ruling) {
     const c = S.case; if (!c) return;
     const d = S.deals.find((x) => x.id === c.deal), rep = byId(S, c.by);
-    const tally = {}; Object.values(c.votes).forEach((v) => { tally[v] = (tally[v] || 0) + 1; });
-    const top = Math.max(0, ...Object.values(tally)), win = Object.keys(tally).filter((k) => tally[k] === top);
-    S.case = null; S.verdict = { seq: ((S.verdict && S.verdict.seq) || 0) + 1, text: '' };
-    const say = (m) => { S.verdict.text = m; log(S, '⚖️ ' + m); };
-    if (!d || !top || win.length !== 1) { say('Denúncia arquivada (sem maioria): nada acontece.'); return; }
-    const v = win[0], pen = casePen(d), acc = c.accused.map((id) => byId(S, id)).filter(Boolean);
+    const by = ruling.by || 'Juiz Digital';
+    S.case = null; S.verdict = { seq: ((S.verdict && S.verdict.seq) || 0) + 1, text: '', verdict: ruling.verdict, laws: ruling.laws || [], by };
+    const say = (m) => { S.verdict.text = m; log(S, '⚖️ ' + by + ': ' + m); };
+    if (!d || !VERDICTS[ruling.verdict]) { say('Denúncia arquivada: nada acontece.'); return; }
+    const v = ruling.verdict, pen = casePen(d, ruling.mult), acc = c.accused.map((id) => byId(S, id)).filter(Boolean);
     const A = byId(S, d.a), Bp = byId(S, d.b), names = acc.map((p) => p.name).join(' e ');
-    if (v === 'fine') {
-      acc.forEach((p) => transfer(S, p, 'bank', pen));
-      say('Veredicto: MULTA. ' + names + ' paga' + (acc.length > 1 ? 'm' : '') + ' até ' + money(pen) + ' cada ao banco.');
+    const why = ' ' + (ruling.why || '');
+    const lawTxt = (ruling.laws && ruling.laws.length ? ' [Art. ' + ruling.laws.join(', ') + ']' : '');
+    const punish = (pid) => { const r = recOf(S, pid); r.strikes++; };
+    const giveBack = () => {
+      if (!A || !Bp) return;
+      d.give.props.forEach((i) => { if (S.props[i].owner === Bp.id) S.props[i].owner = A.id; });
+      d.get.props.forEach((i) => { if (S.props[i].owner === A.id) S.props[i].owner = Bp.id; });
+      const j1 = Math.min(d.give.jc, Bp.jc.length), j2 = Math.min(d.get.jc, A.jc.length);
+      for (let k = 0; k < j1; k++) A.jc.push(Bp.jc.pop());
+      for (let k = 0; k < j2; k++) Bp.jc.push(A.jc.pop());
+      transfer(S, Bp, A, d.give.cash); transfer(S, A, Bp, d.get.cash);
+    };
+    if (v === 'warn') {
+      acc.forEach((p) => { recOf(S, p.id).warns++; });
+      say('ADVERTÊNCIA a ' + names + '. Nada muda no negócio, mas fica registado.' + lawTxt + why);
+    } else if (v === 'fine') {
+      acc.forEach((p) => { transfer(S, p, 'bank', pen); punish(p.id); });
+      say('MULTA. ' + names + ' paga' + (acc.length > 1 ? 'm' : '') + ' até ' + money(pen) + ' cada ao banco.' + lawTxt + why);
     } else if (v === 'seize') {
       const ps = [...d.give.props, ...d.get.props].filter((i) => S.props[i] && S.props[i].owner && [d.a, d.b].includes(S.props[i].owner));
-      if (!ps.length) { acc.forEach((p) => transfer(S, p, 'bank', pen * 2)); say('Veredicto: CONFISCO (sem propriedades na troca): ' + names + ' paga até ' + money(pen * 2) + ' ao banco.'); }
-      else { ps.forEach((i) => seizeProp(S, i)); say('Veredicto: CONFISCO. ' + ps.map((i) => BOARD[i].n).join(', ') + ' voltou ao banco (à venda).'); }
+      acc.forEach((p) => punish(p.id));
+      if (!ps.length) { acc.forEach((p) => transfer(S, p, 'bank', pen * 2)); say('CONFISCO (sem propriedades na troca): ' + names + ' paga até ' + money(pen * 2) + ' ao banco.' + lawTxt + why); }
+      else { ps.forEach((i) => seizeProp(S, i)); say('CONFISCO. ' + ps.map((i) => BOARD[i].n).join(', ') + ' voltou ao banco (à venda).' + lawTxt + why); }
     } else if (v === 'return') {
-      if (A && Bp) {
-        d.give.props.forEach((i) => { if (S.props[i].owner === Bp.id) S.props[i].owner = A.id; });
-        d.get.props.forEach((i) => { if (S.props[i].owner === A.id) S.props[i].owner = Bp.id; });
-        const j1 = Math.min(d.give.jc, Bp.jc.length), j2 = Math.min(d.get.jc, A.jc.length);
-        for (let k = 0; k < j1; k++) A.jc.push(Bp.jc.pop());
-        for (let k = 0; k < j2; k++) Bp.jc.push(A.jc.pop());
-        transfer(S, Bp, A, d.give.cash); transfer(S, A, Bp, d.get.cash);
-      }
-      say('Veredicto: DEVOLVER. A troca foi anulada e cada um recebeu de volta o que deu.');
+      giveBack();
+      say('DEVOLVER. A troca foi anulada e cada um recebeu de volta o que deu.' + lawTxt + why);
+    } else if (v === 'returnfine') {
+      giveBack();
+      const ben = ruling.ben ? byId(S, ruling.ben) : null, vic = ruling.victim ? byId(S, ruling.victim) : null;
+      if (ben) { transfer(S, ben, vic || 'bank', pen); punish(ben.id); }
+      say('DEVOLVER E MULTAR. A troca foi anulada' + (ben ? ' e ' + ben.name + ' paga até ' + money(pen) + (vic ? ' a ' + vic.name : ' ao banco') : '') + '.' + lawTxt + why);
     } else if (v === 'comp') {
-      if (rep && !rep.bk) { acc.forEach((p) => transfer(S, p, rep, pen)); say('Veredicto: INDEMNIZAÇÃO. ' + names + ' paga' + (acc.length > 1 ? 'm' : '') + ' até ' + money(pen) + ' cada a ' + rep.name + '.'); }
-      else say('Veredicto: indemnização, mas quem denunciou já não está no jogo.');
+      if (rep && !rep.bk) { acc.forEach((p) => { transfer(S, p, rep, pen); punish(p.id); }); say('INDEMNIZAÇÃO. ' + names + ' paga' + (acc.length > 1 ? 'm' : '') + ' até ' + money(pen) + ' cada a ' + rep.name + '.' + lawTxt + why); }
+      else say('Indemnização decretada, mas quem denunciou já não está no jogo.');
     } else {
       const share = Math.floor(pen / Math.max(1, acc.length));
-      if (rep) acc.forEach((p) => transfer(S, rep, p, share));
-      say('Veredicto: DENÚNCIA INVÁLIDA. ' + (rep ? rep.name : 'Quem denunciou') + ' paga até ' + money(pen) + ' de indemnização a ' + names + '.');
+      if (rep) { acc.forEach((p) => transfer(S, rep, p, share)); const r = recOf(S, rep.id); r.frivolous++; if (r.frivolous >= 2) { r.ban = (S.round || 1) + 4; } }
+      say('DENÚNCIA INVÁLIDA. ' + (rep ? rep.name : 'Quem denunciou') + ' paga até ' + money(pen) + ' de indemnização a ' + names + '.' + lawTxt + why);
     }
     d.verdict = v; trySettle(S);
   }
-  function caseDone(S) {
-    const need = caseNeeded(S);
-    return need.length === 0 || need.every((id) => S.case.votes[id]);
+  /* o juiz de base decide já; com juiz externo (Claude) o caso fica "em deliberação" até E.rule() */
+  function ruleCase(S) {
+    const c = S.case; if (!c || c.phase === 'ruling') return;
+    const d = S.deals.find((x) => x.id === c.deal);
+    if (!d) { S.case = null; return; }
+    const local = JG().decide(E, S, c, d);
+    if (E.extJudge) { c.phase = 'ruling'; c.left = 0; c.local = local; return; }
+    resolveCase(S, local);
   }
+  /* aplica um parecer externo, validado: nunca pode ser mais severo que 'confiscar' nem inventar veredictos */
+  function rule(S, ruling) {
+    const c = S.case; if (!c) return;
+    const local = c.local || JG().decide(E, S, c, S.deals.find((x) => x.id === c.deal));
+    let r = ruling && VERDICTS[ruling.verdict] ? ruling : local;
+    if (r !== local) r = { verdict: r.verdict, laws: (r.laws || []).map(Number).filter((n) => JG().LAWS[n]).slice(0, 4), why: String(r.why || '').slice(0, 320), mult: local.mult, by: r.by || 'Juiz Digital (IA)', ben: local.ben, victim: local.victim };
+    else r = Object.assign({}, local, { by: 'Juiz Digital' });
+    r.ben = local.ben; r.victim = local.victim;
+    resolveCase(S, r);
+  }
+  const caseDone = (S) => S.case.accused.every((id) => { const p = byId(S, id); return !p || p.bk || p.bot || p.auto || S.case.defs[id]; });
+  /* parecer do Juiz sobre propostas (modo da sala: off | warn | guard). Em 'warn' nunca veta; em 'off' não opina. */
+  function judgeTrade(S, t) {
+    const mode = S.settings.judgeMode || 'guard'; if (mode === 'off') return null;
+    const rv = JG().reviewTrade(E, S, t);
+    if (rv.level === 'veto' && mode !== 'guard') rv.level = 'warn';
+    return rv.level === 'ok' ? null : rv;
+  }
+  function judgeLoan(S, r) {
+    const mode = S.settings.judgeMode || 'guard'; if (mode === 'off') return null;
+    const rv = JG().reviewLoan(E, S, r);
+    if (rv.level === 'veto' && mode !== 'guard') rv.level = 'warn';
+    return rv.level === 'ok' ? null : rv;
+  }
+  const vetoMsg = (rv) => '⚖️ O Juiz Digital vetou esta proposta (Art. ' + rv.law + ' – ' + JG().LAWS[rv.law].t + '): ' + rv.msg;
+  const BOT_NAMES = ['Kiala', 'Zeca', 'Nzinga', 'Mwana', 'Tchizé', 'Bento', 'Dolores', 'Xavier', 'Lourenço', 'Madalena', 'Sebastião', 'Ngola'];
+  const BOT_STYLES = ['equilibrado', 'agressivo', 'cauteloso', 'negociador'];
+  /* mesa de negociação pública: tudo o que se propõe/decide aparece a todos (nada é segredo) */
+  const cp = (x) => ({ cash: x.cash, props: x.props.slice(), jc: x.jc });
+  function pub(S, st, from, to, give, get, extra) {
+    S.pub = S.pub || []; S.pub.push(Object.assign({ id: ++S.pubn, k: 'trade', st, from, to, give: cp(give), get: cp(get), round: S.round }, extra || {}));
+    if (S.pub.length > 10) S.pub.shift();
+  }
+  const pubLoan = (S, st, r) => { S.pub = S.pub || []; S.pub.push({ id: ++S.pubn, k: 'loan', st, from: r.from, to: r.to, amount: r.amount, rate: r.rate, n: r.n, round: S.round }); if (S.pub.length > 10) S.pub.shift(); };
   const cleanSide = (s) => ({ cash: Math.max(0, Math.floor(+s.cash || 0)), props: (s.props || []).map(Number), jc: Math.max(0, Math.floor(+s.jc || 0)) });
 
   /* ------------------------------------------------------------------ ACÇÕES */
@@ -612,8 +673,17 @@
       if (a.type === 'token') { const t = a.token | 0; if (t < 0 || t > 11 || S.players.some((x) => x.token === t && x.id !== pid)) return 'Peça indisponível.'; me.token = t; return null; }
       if (a.type === 'rename') { me.name = String(a.name || '').trim().slice(0, 16) || me.name; return null; }
       if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
-      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; S.settings.go = Math.min(2000, Math.max(100, Math.round(((a.go | 0) || 500) / 50) * 50)); S.settings.limitHouses = a.limitHouses !== false; S.settings.lateJoin = a.lateJoin !== false; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
+      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; S.settings.go = Math.min(2000, Math.max(100, Math.round(((a.go | 0) || 500) / 50) * 50)); S.settings.limitHouses = a.limitHouses !== false; S.settings.lateJoin = a.lateJoin !== false; S.settings.judgeMode = ['off', 'warn', 'guard'].includes(a.judgeMode) ? a.judgeMode : 'guard'; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
       if (a.type === 'start') return start(S);
+      if (a.type === 'addBot') {
+        if (S.players.length >= 12) return 'A sala está cheia (máximo 12 jogadores).';
+        const used = S.players.map((x) => x.name), taken = S.players.map((x) => x.token);
+        const nm = BOT_NAMES.find((n) => !used.includes(n + ' 🤖')) || 'Bot' + (S.players.length + 1);
+        const token = TOKENS.findIndex((_, i) => !taken.includes(i));
+        const style = BOT_STYLES.includes(a.style) ? a.style : BOT_STYLES[S.players.filter((x) => x.bot).length % BOT_STYLES.length];
+        S.players.push({ id: 'bot_' + Math.random().toString(36).slice(2, 8), name: nm + ' 🤖', token, connected: true, cash: 0, pos: 0, jail: false, jt: 0, jc: [], bk: false, miss: 0, auto: false, bot: true, style });
+        return null;
+      }
       if (a.type === 'kick') { if (a.pid === pid) return 'Não te podes expulsar.'; S.players = S.players.filter((x) => x.id !== a.pid); return null; }
       return 'Acção inválida no lobby.';
     }
@@ -716,18 +786,21 @@
         const t = { id: ++S.tid, from: pid, to: to.id, give: cleanSide(a.give || {}), get: cleanSide(a.get || {}) };
         if (!t.give.cash && !t.give.props.length && !t.give.jc && !t.get.cash && !t.get.props.length && !t.get.jc) return 'Proposta vazia.';
         const e = validTrade(S, t); if (e) return e;
-        S.trades.push(t); log(S, me.name + ' propôs uma troca a ' + to.name + '.'); return null;
+        const rv = judgeTrade(S, t); if (rv && rv.level === 'veto') { pub(S, 'veto', t.from, t.to, t.give, t.get, { law: rv.law, msg: rv.msg }); return vetoMsg(rv); }
+        if (rv) t.rv = rv;
+        S.trades.push(t); log(S, me.name + ' propôs uma troca a ' + to.name + '.' + (rv && rv.level === 'warn' ? ' ⚖️ O Juiz avisa: ' + rv.msg : '')); return null;
       }
       case 'tradeYes': {
         const t = S.trades.find((x) => x.id === a.id); if (!t || t.to !== pid) return 'Proposta inexistente.';
         const e = validTrade(S, t);
         S.trades = S.trades.filter((x) => x.id !== t.id);
         if (e) return 'Troca inválida: ' + e;
-        execTrade(S, t); trySettle(S); return null;
+        const rv = judgeTrade(S, t); if (rv && rv.level === 'veto') { log(S, '⚖️ O Juiz Digital vetou uma troca entre ' + byId(S, t.from).name + ' e ' + me.name + ' (Art. ' + rv.law + ').'); pub(S, 'veto', t.from, t.to, t.give, t.get, { law: rv.law, msg: rv.msg }); return vetoMsg(rv); }
+        execTrade(S, t); pub(S, 'ok', t.from, t.to, t.give, t.get); trySettle(S); return null;
       }
       case 'tradeNo': {
         const t = S.trades.find((x) => x.id === a.id); if (!t || (t.to !== pid && t.from !== pid)) return 'Proposta inexistente.';
-        S.trades = S.trades.filter((x) => x.id !== t.id); log(S, t.to === pid ? me.name + ' recusou uma troca.' : me.name + ' cancelou uma troca.'); return null;
+        S.trades = S.trades.filter((x) => x.id !== t.id); log(S, t.to === pid ? me.name + ' recusou uma troca.' : me.name + ' cancelou uma troca.'); pub(S, t.to === pid ? 'no' : 'cancel', t.from, t.to, t.give, t.get); return null;
       }
       case 'loanBank': {
         const amt = a.amount | 0, n = a.n | 0, pen = a.pen === 'neg' ? 'neg' : 'prop';
@@ -747,7 +820,8 @@
         if (!(t.rate >= 0 && t.rate <= 100)) return 'A taxa de juro tem de estar entre 0% e 100%.';
         if (S.lreq.filter((r) => r.from === pid).length >= 3) return 'Tens demasiados pedidos pendentes.';
         if (S.loans.filter((l) => l.borrower === pid).length >= 4) return 'Máximo de 4 empréstimos activos.';
-        S.lreq.push({ id: ++S.lid, from: pid, to: to.id, ...t });
+        const lrv = judgeLoan(S, { from: pid, to: to.id, ...t }); if (lrv && lrv.level === 'veto') return vetoMsg(lrv);
+        S.lreq.push({ id: ++S.lid, from: pid, to: to.id, ...t, rv: lrv && lrv.level !== 'ok' ? lrv : undefined });
         log(S, '💬 ' + me.name + ' pediu ' + money(t.amount) + ' a ' + to.name + '.'); return null;
       }
       case 'loanYes': {
@@ -756,12 +830,12 @@
         if (!b || b.bk) return 'O jogador já não está no jogo.';
         if (avail(S, me) < r.amount) return 'Não tens dinheiro suficiente para emprestar.';
         if (S.loans.filter((l) => l.borrower === b.id).length >= 4) return 'O jogador já tem demasiados empréstimos.';
-        me.cash -= r.amount; b.cash += r.amount; S.loans.push(newLoan(S, pid, b.id, r.amount, r.rate, r.n, r.pen));
+        pubLoan(S, 'ok', r); me.cash -= r.amount; b.cash += r.amount; S.loans.push(newLoan(S, pid, b.id, r.amount, r.rate, r.n, r.pen));
         log(S, '🤝 ' + me.name + ' emprestou ' + money(r.amount) + ' a ' + b.name + ' (' + r.rate + '%, ' + r.n + ' rondas).'); trySettle(S); return null;
       }
       case 'loanNo': {
         const r = S.lreq.find((x) => x.id === a.id && (x.to === pid || x.from === pid)); if (!r) return 'Pedido inexistente.';
-        S.lreq = S.lreq.filter((x) => x.id !== r.id); log(S, r.to === pid ? me.name + ' recusou um pedido de empréstimo.' : me.name + ' cancelou um pedido de empréstimo.'); return null;
+        S.lreq = S.lreq.filter((x) => x.id !== r.id); pubLoan(S, r.to === pid ? 'no' : 'cancel', r); log(S, r.to === pid ? me.name + ' recusou um pedido de empréstimo.' : me.name + ' cancelou um pedido de empréstimo.'); return null;
       }
       case 'repay': {
         const L = S.loans.find((x) => x.id === a.id && x.borrower === pid); if (!L) return 'Empréstimo inexistente.';
@@ -769,24 +843,27 @@
         me.cash -= L.rem; creditLender(S, L, L.rem); dropLoan(S, L); log(S, '✅ ' + me.name + ' quitou um empréstimo antecipadamente.'); return null;
       }
       case 'report': {
-        if (S.case) return 'Já há uma denúncia em julgamento.';
+        if (S.case) return 'O Juiz já está a julgar outro caso.';
         const d = (S.deals || []).find((x) => x.id === a.deal);
         if (!d) return 'Negócio inexistente (só os últimos 12 podem ser denunciados).';
         if (d.rep) return 'Este negócio já foi denunciado.';
+        const rc = recOf(S, pid);
+        if (rc.ban > (S.round || 1)) return 'Perdeste o direito de denunciar até à ronda ' + rc.ban + ' (denúncias infundadas, Art. 7).';
+        if (rc.last && (S.round || 1) - rc.last < 2) return 'Só podes denunciar uma vez de 2 em 2 rondas.';
         const accused = [d.a, d.b].filter((id) => id !== pid);
-        let voters = S.players.filter((p) => !p.bk && p.id !== d.a && p.id !== d.b && p.id !== pid).map((p) => p.id);
-        if (!voters.length && pid !== d.a && pid !== d.b) voters = [pid];
-        if (!voters.length) return 'Não há jurados suficientes (precisa de pelo menos um jogador fora do negócio).';
-        d.rep = true;
-        S.case = { id: ++S.cid, deal: d.id, by: pid, accused, voters, votes: {}, reason: String(a.reason || '').trim().slice(0, 120), left: 60 };
-        log(S, '⚖️ ' + me.name + ' denunciou uma troca entre ' + byId(S, d.a).name + ' e ' + byId(S, d.b).name + '. Os jurados têm 60 s para votar.'); return null;
+        if (!accused.length) return 'Não podes denunciar um negócio contigo próprio.';
+        d.rep = true; rc.last = S.round || 1;
+        const heard = accused.every((id) => { const p = byId(S, id); return !p || p.bot; });
+        S.case = { id: ++S.cid, deal: d.id, by: pid, accused, defs: {}, phase: 'hearing', reason: String(a.reason || '').trim().slice(0, 120), left: heard ? 3 : 20 };
+        log(S, '⚖️ ' + me.name + ' levou a troca entre ' + byId(S, d.a).name + ' e ' + byId(S, d.b).name + ' a julgamento. O Juiz Digital ouve a defesa e decide.'); return null;
       }
-      case 'vote': {
-        const c = S.case; if (!c) return 'Não há nenhuma denúncia em julgamento.';
-        if (!c.voters.includes(pid)) return 'Não és jurado neste caso.';
-        if (!VERDICTS[a.v]) return 'Voto inválido.';
-        c.votes[pid] = a.v; if (caseDone(S)) resolveCase(S); return null;
+      case 'defend': {
+        const c = S.case; if (!c || c.phase !== 'hearing') return 'Não há nenhuma audiência a decorrer.';
+        if (!c.accused.includes(pid)) return 'Só os acusados podem apresentar defesa.';
+        const t = String(a.text || '').trim().slice(0, 160); if (!t) return 'Escreve a tua defesa.';
+        c.defs[pid] = t; log(S, '🛡️ ' + me.name + ' (defesa): ' + t); if (caseDone(S)) { ruleCase(S); } return null;
       }
+      case 'vote': return 'Já não há votação: quem decide é o Juiz Digital.';
       case 'kick': {
         if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
         const v = byId(S, a.pid); if (!v || v.bk) return 'Jogador inválido.';
@@ -796,6 +873,7 @@
     return 'Acção desconhecida.';
   }
 
-  Object.assign(E, { VERDICTS, casePen, dealValue, BOARD, GROUPS, GC, RAILS, UTILS, TOKENS, PCOL, CARDS, newGame, join, start, act, tick, byId, cur, calcRent, canBuild, canSell, bankRate, loanTotal, LOAN_GRACE, mortVal, unmortCost, validTrade, ownsGroup, groupBuilt, money });
-  if (typeof module !== 'undefined' && module.exports) module.exports = E; else root.Engine = E;
+  Object.assign(E, { rule, BOT_STYLES, VERDICTS, casePen, dealValue, BOARD, GROUPS, GC, RAILS, UTILS, TOKENS, PCOL, CARDS, newGame, join, start, act, tick, byId, cur, calcRent, canBuild, canSell, bankRate, loanTotal, LOAN_GRACE, mortVal, unmortCost, validTrade, ownsGroup, groupBuilt, money });
+  E.avail = avail; E.actorOf = actorOf;
+  if (typeof module !== 'undefined' && module.exports) { E.Judge = require('./judge.js'); E.Bots = require('./bots.js'); module.exports = E; } else { E.Judge = root.Judge; root.Engine = E; }
 })(typeof window !== 'undefined' ? window : this);
