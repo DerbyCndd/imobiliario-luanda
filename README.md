@@ -27,6 +27,7 @@ npm test         # simula centenas de jogos + testa as salas
 cartas de Sorte e Caixa Comunitária (16+16), **trocas**, dívidas, falência, vencedor, chat e reconexão.
 **Propriedades confiscadas** por dívidas ao banco ficam à venda: qualquer jogador pode comprá-las ao preço de tabela ou o jogador da vez pode pô-las a leilão.
 **Espectadores e entrada a meio:** quem entra numa partida a decorrer joga se ainda estivermos nas 2 primeiras rondas (com o dinheiro inicial); depois assiste, conversa e fala na chamada de voz.
+**Economia:** a Partida paga 500 Kz (o anfitrião ajusta no lobby), recompensas das cartas até 150 Kz, renda base ≈ 14% do preço da rua e construção mais cara.
 **Limite de casas:** o anfitrião escolhe no lobby se o banco limita casas e hotéis (32/12, escalável) ou se são ilimitados.
 **Juiz por votação:** qualquer jogador pode denunciar uma das últimas trocas; os jogadores fora do negócio votam (60 s) multar, confiscar, devolver, indemnizar o denunciante ou invalidar a denúncia (o denunciante indemniza). Maioria decide; empate arquiva.
 **Sons e voz:** efeitos sonoros sintetizados (dados, passos, dinheiro, cartas, leilão, veredicto) e chamada de voz WebRTC em malha entre todos os da sala (o servidor só faz a sinalização; precisa de HTTPS e, em redes restritivas, pode precisar de um servidor TURN).

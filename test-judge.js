@@ -56,5 +56,11 @@ S.round = 3; E.join(S, 'late2', 'Outro', null); t(S.players.length === 3 && S.sp
 S = game(3); const r0 = S.round; for (let i = 0; i < 3; i++) { S.turn.phase = 'end'; E.act(S, E.cur(S).id, { type: 'endTurn' }); }
 t(S.round === r0 + 1, 'a ronda sobe quando a vez volta ao primeiro');
 // 10. rendas
-t(E.BOARD[1].r[0] >= 4 && E.BOARD[39].r[0] === 55, 'rendas ajustadas');
+t(E.BOARD[1].r[0] >= 4 && E.BOARD[39].r[0] === 56, 'rendas ajustadas');
+// 11. Partida configurável e economia
+S = game(2); t(S.settings.go === 500, 'Partida paga 500 por defeito');
+{ const c = E.cur(S); c.pos = 38; c.cash = 1000; S.turn.phase = 'roll'; E.rand = () => 0.4; E.act(S, c.id, { type: 'roll' }); t(c.cash >= 1500 - 300, 'passar pela Partida recebe 500 (cash ' + c.cash + ')'); }
+S = E.newGame('G', 'p0'); E.join(S, 'p0', 'A', 0); E.join(S, 'p1', 'B', 1); E.act(S, 'p0', { type: 'settings', go: 300, cash: 1500 }); t(S.settings.go === 300, 'anfitrião define a Partida no lobby');
+t(E.CARDS.chance.concat(E.CARDS.cc).every((c) => c.k !== 'get' || c.v <= 150), 'recompensas das cartas até 150 Kz');
+t(E.BOARD.filter((q) => q.t === 'prop').every((q) => q.r[0] / q.p >= 0.12 && q.h >= 70), 'renda base >= 12% do preço e construção mais cara');
 process.exit(ok ? 0 : 1);

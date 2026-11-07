@@ -8,45 +8,45 @@
   const P = (n, g, p, r, h) => ({ t: 'prop', n, g, p, r, h });
   const BOARD = [
     { t: 'go', n: 'Partida' },
-    P('Cazenga', 'brown', 60, [4, 20, 60, 180, 320, 450], 50),
+    P('Cazenga', 'brown', 60, [8, 30, 85, 250, 450, 630], 70),
     { t: 'cc', n: 'Caixa Comunitária' },
-    P('Sambizanga', 'brown', 60, [6, 30, 90, 270, 400, 550], 50),
-    { t: 'tax', n: 'Imposto de Rendimento', amt: 200 },
+    P('Sambizanga', 'brown', 60, [8, 40, 125, 380, 560, 770], 70),
+    { t: 'tax', n: 'Imposto de Rendimento', amt: 300 },
     { t: 'rail', n: 'Linha de Luanda', p: 200 },
-    P('Rangel', 'lblue', 100, [8, 40, 100, 300, 450, 600], 50),
+    P('Rangel', 'lblue', 100, [14, 55, 140, 420, 630, 840], 70),
     { t: 'chance', n: 'Sorte' },
-    P('Viana', 'lblue', 100, [8, 40, 100, 300, 450, 600], 50),
-    P('Cacuaco', 'lblue', 120, [10, 50, 150, 450, 625, 750], 50),
+    P('Viana', 'lblue', 100, [14, 55, 140, 420, 630, 840], 70),
+    P('Cacuaco', 'lblue', 120, [16, 70, 210, 630, 875, 1050], 70),
     { t: 'jail', n: 'Cadeia / Visita' },
-    P('Benfica', 'pink', 140, [12, 60, 180, 500, 700, 900], 100),
+    P('Benfica', 'pink', 140, [20, 85, 250, 700, 980, 1260], 140),
     { t: 'util', n: 'ENDE Electricidade', p: 150 },
-    P('Camama', 'pink', 140, [12, 60, 180, 500, 700, 900], 100),
-    P('Golfe', 'pink', 160, [14, 70, 200, 550, 750, 950], 100),
+    P('Camama', 'pink', 140, [20, 85, 250, 700, 980, 1260], 140),
+    P('Golfe', 'pink', 160, [22, 100, 280, 770, 1050, 1330], 140),
     { t: 'rail', n: 'Linha de Benguela', p: 200 },
-    P('Maianga', 'orange', 180, [16, 80, 220, 600, 800, 1000], 100),
+    P('Maianga', 'orange', 180, [26, 110, 310, 840, 1120, 1400], 140),
     { t: 'cc', n: 'Caixa Comunitária' },
-    P('Alvalade', 'orange', 180, [16, 80, 220, 600, 800, 1000], 100),
-    P('Maculusso', 'orange', 200, [18, 90, 250, 700, 875, 1050], 100),
+    P('Alvalade', 'orange', 180, [26, 110, 310, 840, 1120, 1400], 140),
+    P('Maculusso', 'orange', 200, [28, 125, 350, 980, 1225, 1470], 140),
     { t: 'park', n: 'Parque Gratuito' },
-    P('Miramar', 'red', 220, [20, 100, 300, 750, 925, 1100], 150),
+    P('Miramar', 'red', 220, [30, 140, 420, 1050, 1295, 1540], 210),
     { t: 'chance', n: 'Sorte' },
-    P('Prenda', 'red', 220, [20, 100, 300, 750, 925, 1100], 150),
-    P('Kinaxixi', 'red', 240, [22, 110, 330, 800, 975, 1150], 150),
+    P('Prenda', 'red', 220, [30, 140, 420, 1050, 1295, 1540], 210),
+    P('Kinaxixi', 'red', 240, [34, 155, 460, 1120, 1365, 1610], 210),
     { t: 'rail', n: 'Linha de Moçâmedes', p: 200 },
-    P('Ingombota', 'yellow', 260, [24, 120, 360, 850, 1025, 1200], 150),
-    P('Baía de Luanda', 'yellow', 260, [24, 120, 360, 850, 1025, 1200], 150),
+    P('Ingombota', 'yellow', 260, [36, 170, 505, 1190, 1435, 1680], 210),
+    P('Baía de Luanda', 'yellow', 260, [36, 170, 505, 1190, 1435, 1680], 210),
     { t: 'util', n: 'EPAL Águas', p: 150 },
-    P('Ilha do Cabo', 'yellow', 280, [26, 130, 390, 900, 1100, 1275], 150),
+    P('Ilha do Cabo', 'yellow', 280, [40, 180, 545, 1260, 1540, 1785], 210),
     { t: 'gojail', n: 'Vá para a Cadeia' },
-    P('Talatona', 'green', 300, [28, 150, 450, 1000, 1200, 1400], 200),
-    P('Belas', 'green', 300, [28, 150, 450, 1000, 1200, 1400], 200),
+    P('Talatona', 'green', 300, [42, 210, 630, 1400, 1680, 1960], 280),
+    P('Belas', 'green', 300, [42, 210, 630, 1400, 1680, 1960], 280),
     { t: 'cc', n: 'Caixa Comunitária' },
-    P('Kilamba', 'green', 320, [32, 170, 500, 1100, 1300, 1500], 200),
+    P('Kilamba', 'green', 320, [44, 240, 700, 1540, 1820, 2100], 280),
     { t: 'rail', n: 'Linha de Malanje', p: 200 },
     { t: 'chance', n: 'Sorte' },
-    P('Marginal', 'dblue', 350, [40, 200, 550, 1200, 1400, 1600], 200),
-    { t: 'tax', n: 'Imposto de Luxo', amt: 100 },
-    P('Mussulo', 'dblue', 400, [55, 250, 650, 1500, 1800, 2100], 200),
+    P('Marginal', 'dblue', 350, [50, 280, 770, 1680, 1960, 2240], 280),
+    { t: 'tax', n: 'Imposto de Luxo', amt: 150 },
+    P('Mussulo', 'dblue', 400, [56, 350, 910, 2100, 2520, 2940], 280),
   ];
   const GROUPS = {};
   BOARD.forEach((s, i) => { if (s.g) (GROUPS[s.g] = GROUPS[s.g] || []).push(i); });
@@ -58,9 +58,9 @@
   /* ------------------------------------------------------------------ CARTAS */
   const CARDS = {
     chance: [
-      { x: 'Avança até à Partida. Recebe 200 Kz.', k: 'to', v: 0 },
-      { x: 'Avança até Kinaxixi. Se passares pela Partida, recebe 200 Kz.', k: 'to', v: 24 },
-      { x: 'Avança até Benfica. Se passares pela Partida, recebe 200 Kz.', k: 'to', v: 11 },
+      { x: 'Avança até à Partida. Recebe {go}.', k: 'to', v: 0 },
+      { x: 'Avança até Kinaxixi. Se passares pela Partida, recebe {go}.', k: 'to', v: 24 },
+      { x: 'Avança até Benfica. Se passares pela Partida, recebe {go}.', k: 'to', v: 11 },
       { x: 'Avança até à companhia de serviços mais próxima. Se não tiver dono, podes comprá-la; se tiver, paga 10 vezes o valor dos dados.', k: 'util' },
       { x: 'Avança até à linha de comboio mais próxima. Se tiver dono, paga o dobro da renda.', k: 'rail' },
       { x: 'Avança até à linha de comboio mais próxima. Se tiver dono, paga o dobro da renda.', k: 'rail' },
@@ -68,28 +68,28 @@
       { x: 'Sai livre da Cadeia. Guarda esta carta até precisares dela.', k: 'jail' },
       { x: 'Recua 3 casas.', k: 'back' },
       { x: 'Vá para a Cadeia. Vai directamente para a Cadeia, sem passar pela Partida.', k: 'gojail' },
-      { x: 'Reparações gerais nas tuas propriedades: paga 25 Kz por cada casa e 100 Kz por cada hotel.', k: 'repair', v: 25, h: 100 },
-      { x: 'Paga a multa de 15 Kz.', k: 'pay', v: 15 },
-      { x: 'Faz uma viagem na Linha de Luanda. Se passares pela Partida, recebe 200 Kz.', k: 'to', v: 5 },
+      { x: 'Reparações gerais nas tuas propriedades: paga 35 Kz por cada casa e 140 Kz por cada hotel.', k: 'repair', v: 35, h: 140 },
+      { x: 'Paga a multa de 25 Kz.', k: 'pay', v: 25 },
+      { x: 'Faz uma viagem na Linha de Luanda. Se passares pela Partida, recebe {go}.', k: 'to', v: 5 },
       { x: 'Avança até Mussulo.', k: 'to', v: 39 },
       { x: 'Foste eleito presidente da direcção. Paga 50 Kz a cada jogador.', k: 'payEach', v: 50 },
-      { x: 'O teu empréstimo de construção vence. Recebe 150 Kz.', k: 'get', v: 150 },
+      { x: 'O teu empréstimo de construção vence. Recebe 100 Kz.', k: 'get', v: 100 },
     ],
     cc: [
-      { x: 'Avança até à Partida. Recebe 200 Kz.', k: 'to', v: 0 },
-      { x: 'Erro do banco a teu favor. Recebe 200 Kz.', k: 'get', v: 200 },
-      { x: 'Honorários médicos. Paga 50 Kz.', k: 'pay', v: 50 },
+      { x: 'Avança até à Partida. Recebe {go}.', k: 'to', v: 0 },
+      { x: 'Erro do banco a teu favor. Recebe 150 Kz.', k: 'get', v: 150 },
+      { x: 'Honorários médicos. Paga 75 Kz.', k: 'pay', v: 75 },
       { x: 'Vendeste acções. Recebe 50 Kz.', k: 'get', v: 50 },
       { x: 'Sai livre da Cadeia. Guarda esta carta até precisares dela.', k: 'jail' },
       { x: 'Vá para a Cadeia. Vai directamente para a Cadeia, sem passar pela Partida.', k: 'gojail' },
-      { x: 'O fundo de férias vence. Recebe 100 Kz.', k: 'get', v: 100 },
+      { x: 'O fundo de férias vence. Recebe 75 Kz.', k: 'get', v: 75 },
       { x: 'Reembolso de impostos. Recebe 20 Kz.', k: 'get', v: 20 },
       { x: 'É o teu aniversário. Recebe 10 Kz de cada jogador.', k: 'getEach', v: 10 },
-      { x: 'O seguro de vida vence. Recebe 100 Kz.', k: 'get', v: 100 },
-      { x: 'Despesas de hospital. Paga 100 Kz.', k: 'pay', v: 100 },
-      { x: 'Propinas escolares. Paga 50 Kz.', k: 'pay', v: 50 },
+      { x: 'O seguro de vida vence. Recebe 75 Kz.', k: 'get', v: 75 },
+      { x: 'Despesas de hospital. Paga 150 Kz.', k: 'pay', v: 150 },
+      { x: 'Propinas escolares. Paga 75 Kz.', k: 'pay', v: 75 },
       { x: 'Recebes 25 Kz de honorários de consultoria.', k: 'get', v: 25 },
-      { x: 'Obras nas ruas: paga 40 Kz por cada casa e 115 Kz por cada hotel.', k: 'repair', v: 40, h: 115 },
+      { x: 'Obras nas ruas: paga 55 Kz por cada casa e 160 Kz por cada hotel.', k: 'repair', v: 55, h: 160 },
       { x: 'Ganhaste o segundo prémio num concurso de beleza. Recebe 10 Kz.', k: 'get', v: 10 },
       { x: 'Recebes uma herança de 100 Kz.', k: 'get', v: 100 },
     ],
@@ -102,11 +102,12 @@
   const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(E.rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const d6 = () => 1 + Math.floor(E.rand() * 6);
   const money = (n) => n + ' Kz';
+  const goPay = (S) => (S.settings.go | 0) || 500;
   const avail = (S, p) => p.cash - (S.auction && S.auction.bidder === p.id ? S.auction.bid : 0);
 
   function newGame(code, hostPid) {
     return {
-      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, pot: false, turnTime: 60, limitHouses: true, lateJoin: true }, tl: 0, tk: '',
+      v: 1, phase: 'lobby', code, hostPid, settings: { cash: 1500, go: 500, pot: false, turnTime: 60, limitHouses: true, lateJoin: true }, tl: 0, tk: '',
       players: [], specs: [], round: 1, deals: [], did: 0, case: null, cid: 0, verdict: null, cur: 0, props: {}, houses: 32, hotels: 12,
       turn: { phase: 'roll', doubles: 0, extra: false, dice: [1, 1], seq: 0, pend: 0 },
       debts: [], auction: null, aq: [], seized: [], trades: [], tid: 0, loans: [], lreq: [], lid: 0, log: [], pot: 0,
@@ -216,11 +217,11 @@
   function goJail(S, p) { p.pos = 10; p.jail = true; p.jt = 0; S.turn.extra = false; log(S, p.name + ' foi para a Cadeia.'); }
   function move(S, p, n) {
     const np = (p.pos + n) % 40;
-    if (p.pos + n >= 40) { p.cash += 200; log(S, p.name + ' passou pela Partida e recebeu 200 Kz.'); }
+    if (p.pos + n >= 40) { p.cash += goPay(S); log(S, p.name + ' passou pela Partida e recebeu ' + money(goPay(S)) + '.'); }
     p.pos = np; land(S, p, {});
   }
   function moveTo(S, p, sq, o) {
-    if (sq < p.pos) { p.cash += 200; log(S, p.name + ' passou pela Partida e recebeu 200 Kz.'); }
+    if (sq < p.pos) { p.cash += goPay(S); log(S, p.name + ' passou pela Partida e recebeu ' + money(goPay(S)) + '.'); }
     p.pos = sq; land(S, p, o || {});
   }
   function land(S, p, o) {
@@ -244,8 +245,9 @@
   function nearest(from, set) { for (const i of set) if (i > from) return i; return set[0]; }
   function drawCard(S, p, deck) {
     const id = S.decks[deck].shift(), c = CARDS[deck][id];
-    S.card = { seq: ++S.cardSeq, deck, text: c.x, pid: p.id };
-    log(S, p.name + ' tirou ' + (deck === 'chance' ? 'Sorte' : 'Caixa Comunitária') + ': ' + c.x);
+    const ctext = c.x.split('{go}').join(money(goPay(S)));
+    S.card = { seq: ++S.cardSeq, deck, text: ctext, pid: p.id };
+    log(S, p.name + ' tirou ' + (deck === 'chance' ? 'Sorte' : 'Caixa Comunitária') + ': ' + ctext);
     if (c.k === 'jail') p.jc.push({ d: deck, id }); else S.decks[deck].push(id);
     const others = S.players.filter((x) => !x.bk && x.id !== p.id);
     switch (c.k) {
@@ -610,7 +612,7 @@
       if (a.type === 'token') { const t = a.token | 0; if (t < 0 || t > 11 || S.players.some((x) => x.token === t && x.id !== pid)) return 'Peça indisponível.'; me.token = t; return null; }
       if (a.type === 'rename') { me.name = String(a.name || '').trim().slice(0, 16) || me.name; return null; }
       if (pid !== S.hostPid) return 'Só o anfitrião pode fazer isso.';
-      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; S.settings.limitHouses = a.limitHouses !== false; S.settings.lateJoin = a.lateJoin !== false; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
+      if (a.type === 'settings') { S.settings.cash = Math.min(10000, Math.max(500, (a.cash | 0) || 1500)); S.settings.pot = !!a.pot; S.settings.go = Math.min(2000, Math.max(100, Math.round(((a.go | 0) || 500) / 50) * 50)); S.settings.limitHouses = a.limitHouses !== false; S.settings.lateJoin = a.lateJoin !== false; const tt = a.turnTime | 0; S.settings.turnTime = [0, 30, 45, 60, 90, 120].includes(tt) ? tt : 60; return null; }
       if (a.type === 'start') return start(S);
       if (a.type === 'kick') { if (a.pid === pid) return 'Não te podes expulsar.'; S.players = S.players.filter((x) => x.id !== a.pid); return null; }
       return 'Acção inválida no lobby.';

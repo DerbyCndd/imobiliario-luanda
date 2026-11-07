@@ -162,12 +162,13 @@ function renderLobby() {
   <div class="card"><h2>Som e voz</h2>${mediaBarHtml()}<p class="hint">A chamada de voz é entre todos os que estão na sala, incluindo quem estiver só a assistir.</p></div>
   ${isHost ? `<div class="card"><h2>Regras da casa</h2>
     <div class="row"><label>Dinheiro inicial <input type="number" id="setCash" value="${S.settings.cash}" min="500" max="10000" step="100" style="width:110px"></label>
+    <label>Salário ao passar pela Partida <input type="number" id="setGo" value="${S.settings.go || 500}" min="100" max="2000" step="50" style="width:110px"></label>
     <label>O banco limita as casas e hotéis? <select id="setLimit"><option value="1" ${S.settings.limitHouses !== false ? 'selected' : ''}>Sim: 32 casas e 12 hotéis (mais com +8 jogadores)</option><option value="0" ${S.settings.limitHouses === false ? 'selected' : ''}>Não: casas e hotéis ilimitados</option></select></label>
     <label><input type="checkbox" id="setLate" ${S.settings.lateJoin !== false ? 'checked' : ''}> Permitir entrar a meio da partida (só nas 2 primeiras rondas; depois assistem)</label>
     <label><input type="checkbox" id="setPot" ${S.settings.pot ? 'checked' : ''}> Multas e impostos acumulam no Parque Gratuito</label>
     <label>Tempo por jogada <select id="setTime">${[[0, 'Sem limite'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']].map(([v, l]) => `<option value="${v}" ${S.settings.turnTime === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
     <p class="hint">Se alguém demorar mais que o tempo, o jogo joga a vez por essa pessoa; depois de 2 vezes seguidas passa a modo automático até voltar a clicar.</p>
-    <p class="hint">Por defeito segue as regras oficiais: 1500 Kz iniciais e o Parque Gratuito não paga nada.</p></div>
+    <p class="hint">Por defeito: 1500 Kz iniciais, 500 Kz de cada vez que se passa pela Partida e o Parque Gratuito não paga nada.</p></div>
     <button class="bigbtn" data-act="start" ${S.players.length < 2 ? 'disabled' : ''}>▶ Começar o jogo</button>
     ${S.players.length < 2 ? '<p class="hint" style="text-align:center">Faltam jogadores (mínimo 2).</p>' : ''}`
   : '<p class="hint" style="text-align:center;font-size:16px">A aguardar que o anfitrião comece o jogo…</p>'}
@@ -261,7 +262,7 @@ function deedHtml(i) {
     <tr><td>Com hotel</td><td>${kz(s.r[5])}</td></tr></table><hr><table><tr><td>Custo de cada casa</td><td>${kz(s.h)}</td></tr><tr><td>Custo do hotel</td><td>${kz(s.h)} + 4 casas</td></tr></table>`;
   } else if (s.t === 'rail') body = '<table><tr><td>Renda (1 linha)</td><td>25 Kz</td></tr><tr><td>2 linhas</td><td>50 Kz</td></tr><tr><td>3 linhas</td><td>100 Kz</td></tr><tr><td>4 linhas</td><td>200 Kz</td></tr></table>';
   else if (s.t === 'util') body = '<p>Com 1 companhia: renda = <b>4×</b> os dados.<br>Com as 2: <b>10×</b> os dados.</p>';
-  else body = `<p>${s.t === 'tax' ? 'Paga ' + kz(s.amt) + ' ao banco.' : s.t === 'go' ? 'Recebe 200 Kz de cada vez que passas por aqui.' : s.t === 'jail' ? 'Só de visita... ou preso.' : s.t === 'park' ? 'Descansa (nada acontece).' : s.t === 'gojail' ? 'Vais directamente para a Cadeia.' : 'Tira uma carta.'}</p>`;
+  else body = `<p>${s.t === 'tax' ? 'Paga ' + kz(s.amt) + ' ao banco.' : s.t === 'go' ? 'Recebe ' + kz(S.settings.go || 500) + ' de cada vez que passas por aqui.' : s.t === 'jail' ? 'Só de visita... ou preso.' : s.t === 'park' ? 'Descansa (nada acontece).' : s.t === 'gojail' ? 'Vais directamente para a Cadeia.' : 'Tira uma carta.'}</p>`;
   const light = ['lblue', 'yellow'].includes(s.g) || !s.g;
   return `<div class="deed"><div class="dh" style="background:${s.g ? E.GC[s.g] : '#e9efe2'};color:${light ? '#111' : '#fff'}">${icon(s)} ${esc(s.n)}</div><div class="db">
     ${s.p ? `<p><b>Preço: ${kz(s.p)}</b> · Hipoteca: ${kz(s.p / 2)}</p>` : ''}${body}
@@ -514,7 +515,7 @@ function closeModal() { $('#modal').classList.add('hidden'); ui.trade = null; }
 function rulesHtml() {
   return `<h2>📖 Regras</h2><div style="font-size:14px;line-height:1.5;color:var(--txt)">
   <p><b>Objectivo:</b> ficar como o único jogador com dinheiro. Cada jogador começa com 1500 Kz.</p>
-  <p><b>Vez:</b> lança os dados e avança. Passar pela <b>Partida</b> dá 200 Kz. <b>Duplo</b> = jogas outra vez; <b>3 duplos</b> seguidos = Cadeia.</p>
+  <p><b>Vez:</b> lança os dados e avança. Passar pela <b>Partida</b> dá ${kz((S && S.settings && S.settings.go) || 500)}. <b>Duplo</b> = jogas outra vez; <b>3 duplos</b> seguidos = Cadeia.</p>
   <p><b>Comprar:</b> propriedade sem dono pode ser comprada; se recusares vai a <b>leilão</b>. Com dono, pagas renda.</p>
   <p><b>Cores:</b> todas as ruas de uma cor = renda a dobrar e podes construir (uniformemente; 4 casas e depois hotel). Se o anfitrião activar o limite, o banco tem 32 casas e 12 hotéis (com mais de 8 jogadores, ganha 4 casas e 1,5 hotéis por jogador extra); caso contrário são ilimitados.</p>
   <p><b>Linhas e serviços:</b> linhas 25/50/100/200 Kz; serviços 4× (ou 10× com os dois) os dados.</p>
@@ -600,7 +601,7 @@ document.addEventListener('click', (ev) => {
     case 'leave': if (!local && S.phase === 'play' && !confirm('Sair desta sala? Podes voltar a entrar com o mesmo código.')) break; leaveRoom(); break;
     case 'token': dispatch({ type: 'token', token: +t.dataset.token }); break;
     case 'kick': dispatch({ type: 'kick', pid: t.dataset.pid }); break;
-    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value, limitHouses: $('#setLimit').value === '1', lateJoin: $('#setLate').checked }); dispatch({ type: 'start' }); break;
+    case 'start': dispatch({ type: 'settings', cash: +$('#setCash').value, go: +$('#setGo').value, pot: $('#setPot').checked, turnTime: +$('#setTime').value, limitHouses: $('#setLimit').value === '1', lateJoin: $('#setLate').checked }); dispatch({ type: 'start' }); break;
     case 'sfx': SFX.setMuted(!SFX.isMuted()); ui.lastSig = ''; render(); break;
     case 'vjoin': Voice.join(); break;
     case 'vleave': Voice.leave(); break;
